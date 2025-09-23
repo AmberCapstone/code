@@ -1,0 +1,10 @@
+.vscode
+.DS_STORE
+.pio
+
+# Virtual environments
+.env*
+.venv*
+
+# Python
+__pycache__
