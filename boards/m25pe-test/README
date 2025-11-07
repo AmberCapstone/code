@@ -1,0 +1,5 @@
+Connect an M25PE10 to the Arduino. Use the pinout described in `main.cpp`
+
+Open a serial monitor and connect to the Arduino at 115200 baud.
+
+Send hex commands to read/write/erase pages in the flash.

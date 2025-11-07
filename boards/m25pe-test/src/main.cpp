@@ -89,9 +89,9 @@ void loop() {
                 Serial.println(
                     "Ready to interact. Send the following in HEX. Address is "
                     "3 bytes, LSB sent first.");
-                Serial.println("Write  W|address|byte0,byte1,...byteN");
-                Serial.println("Read   R|address");
-                Serial.println("Erase  E|address");
+                Serial.println("Write  x57|address|byte0,byte1,...byteN");
+                Serial.println("Read   x52|address");
+                Serial.println("Erase  x45|address");
             }
             if (Serial.available()) {
                 new_state = RECEIVING;
