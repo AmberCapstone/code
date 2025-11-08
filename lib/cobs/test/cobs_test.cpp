@@ -25,7 +25,7 @@ TEST(COBS, ZeroString) {
 
     uint8_t dec_output[256];
     Decoder decoder(dec_output);
-    decoder.Decode(encoded, enc_length);
+    EXPECT_TRUE(decoder.Decode(encoded, enc_length));
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
 }
 
@@ -42,7 +42,7 @@ TEST(COBS, Short) {
 
     uint8_t dec_output[256];
     Decoder decoder(dec_output);
-    decoder.Decode(encoded, enc_length);
+    EXPECT_TRUE(decoder.Decode(encoded, enc_length));
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
 }
 
@@ -59,7 +59,7 @@ TEST(COBS, ManyZeros) {
 
     uint8_t dec_output[256];
     Decoder decoder(dec_output);
-    decoder.Decode(encoded, enc_length);
+    EXPECT_TRUE(decoder.Decode(encoded, enc_length));
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
 }
 
@@ -120,7 +120,7 @@ TEST(COBS, FFBlock) {
 
     uint8_t dec_output[512] = {0};
     Decoder decoder(dec_output);
-    decoder.Decode(encoded, enc_length);
+    EXPECT_TRUE(decoder.Decode(encoded, enc_length));
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
 
     // Test partial decoding

@@ -16,9 +16,7 @@ bool Decoder::Decode(const uint8_t* encoded, size_t encoded_length) {
 
     const uint8_t* input_cursor = encoded;
 
-    int counter = 0;
     for (; input_cursor < encoded + encoded_length; --block_remaining_) {
-        counter++;
         if (block_remaining_ > 0) {
             buffer[length++] = *input_cursor++;
         } else {
