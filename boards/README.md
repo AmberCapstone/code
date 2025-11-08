@@ -12,4 +12,4 @@ Run `PlatformIO: Upload` or click the "Right Arrow" icon.
 
 ## Running Tests
 
-Run `PlatformIO: Test` or click the "Flask" icon.
+Run `PlatformIO: Test` or click the "Flash" icon.
