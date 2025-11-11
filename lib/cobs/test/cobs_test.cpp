@@ -29,6 +29,23 @@ TEST(COBS, ZeroString) {
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
 }
 
+TEST(COBS, EmptyString) {
+    uint8_t decoded[] = {};
+    size_t dec_length = sizeof(decoded) / sizeof(decoded[0]);
+
+    uint8_t encoded[] = {0x01, 0x00};
+    size_t enc_length = sizeof(encoded) / sizeof(encoded[0]);
+
+    uint8_t enc_output[256];
+    size_t enc_length_actual = Encode(decoded, dec_length, enc_output);
+    EXPECT_ARRAY_EQUAL(encoded, enc_length, enc_output, enc_length_actual);
+
+    uint8_t dec_output[256];
+    Decoder decoder(dec_output);
+    EXPECT_TRUE(decoder.Decode(encoded, enc_length));
+    EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
+}
+
 TEST(COBS, Short) {
     uint8_t decoded[] = {0x11, 0x22, 0x00, 0x33};
     size_t dec_length = sizeof(decoded) / sizeof(decoded[0]);
