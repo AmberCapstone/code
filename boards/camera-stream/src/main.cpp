@@ -18,30 +18,10 @@
 
 using namespace amber;
 
-volatile uint16_t rows = 0;
-volatile uint16_t frames = 0;
-
 typedef struct {
     ov7670::reg reg;
     uint8_t value;
 } setting_t;
-
-const setting_t settings[] = {
-    {ov7670::reg::TSLB, 0x04},  // output sequence YUYV
-
-    // VGA Settings (from Table 2-2)
-    {ov7670::reg::CLKRC, 0x01},  // input clock prescaler = 2
-    // {COM7, 0x00},  // VGA, YUV output (this is default)
-    // {COM3, 0x00}, // No scale, no tristate (this is default)
-    {ov7670::reg::COM14, 0x00},  // No manual scaling, PCLK divider = 1
-    {ov7670::reg::SCALING_XSC, 0x3A},
-    {ov7670::reg::SCALING_YSC, 0x35},
-    {ov7670::reg::SCALING_DCWCTR, 0x11},
-    {ov7670::reg::SCALING_PCLK_DIV, 0xF0},
-    {ov7670::reg::SCALING_PCLK_DELAY, 0x02},
-};
-
-const uint8_t LEN_SETTINGS = sizeof(settings) / sizeof(settings[0]);
 
 int main(void) {
     cli();
@@ -57,13 +37,20 @@ int main(void) {
     DDRC &= ~DATA_3_0_MASK;
     DDRD &= ~DATA_7_4_MASK;
 
-    // Interupt pins
-    DDRD &= ~_BV(PD2);  // HREF - rising edge indicates start of new row
-    EICRA |= _BV(ISC01) | _BV(ISC00);
+    // Synchronization pins
 
-    DDRD &= ~_BV(PD3);  // VSYNC - rising edge indicates start of new frame
+    // PCLK - rising edge indicates a new byte is available
+    DDRD &= ~_BV(PD2);
+    EICRA |= _BV(ISC01) | _BV(ISC00);
+    // don't enable this interrupt yet - HREF handles it
+
+    // VSYNC - rising edge indicates start of new frame
+    DDRD &= ~_BV(PD3);
     EICRA |= _BV(ISC11) | _BV(ISC10);
-    EIMSK |= _BV(INT1) | _BV(INT0);
+
+    // HREF - rising edge indicates start of new row. stays high during the row
+    DDRB &= ~_BV(PB0);
+    PCICR |= _BV(PCIF0);
 
     twi::Initialize();
     serial::Initialize();
@@ -74,30 +61,55 @@ int main(void) {
     // Wait at least 1 ms after reset (implementation guide 8.1.1)
     _delay_ms(2);
 
-    // for (const setting_t* s = settings; s < settings + LEN_SETTINGS; s++)
-    // {
-    //     twi::WriteRegister(settings->reg, settings->value);
-    // }
+    constexpr setting_t settings[] = {
+        {ov7670::reg::CLKRC, 0x9f},  // input clock prescaler = 2
+        {ov7670::reg::TSLB, 0x00},   // output sequence YUYV
 
-    char buffer[100];
-    uint8_t pid = 0;
-    uint8_t ver = 0;
+        // VGA Settings (from Table 2-2)
+        {ov7670::reg::COM7, 0x00},   // VGA, YUV output (this is default)
+        {ov7670::reg::COM3, 0x00},   // No scale, no tristate (this is default)
+        {ov7670::reg::COM14, 0x00},  // No manual scaling, PCLK divider = 1
+        {ov7670::reg::COM10, 0x20},
+        {ov7670::reg::SCALING_XSC, 0x3A},
+        {ov7670::reg::SCALING_YSC, 0x35},
+        {ov7670::reg::SCALING_DCWCTR, 0x11},
+        {ov7670::reg::SCALING_PCLK_DIV, 0xF0},
+        {ov7670::reg::SCALING_PCLK_DELAY, 0x02},
+    };
+    constexpr uint8_t LEN_SETTINGS = sizeof(settings) / sizeof(settings[0]);
+
+    for (const setting_t* s = settings; s < settings + LEN_SETTINGS; s++) {
+        twi::WriteRegister(s->reg, s->value);
+    }
+
+    // Enable pin interrupts
+    EIMSK |= _BV(INT1) | _BV(INT0);
+    PCMSK0 |= _BV(PCINT0);
 
     while (1) {
-        twi::ReadRegister(ov7670::reg::VER, &ver);
-        twi::ReadRegister(ov7670::reg::PID, &pid);
+        continue;
+    }
+}
 
-        // uint16_t len = sprintf(buffer, "V: %d\t H: %d\n", frames, rows);
-        uint16_t len = sprintf(buffer, "PID: %02x\t VER: %02x", pid, ver);
-        serial::Transmit((uint8_t*)buffer, len);
-        _delay_ms(1000);
+volatile bool y_byte = true;
+
+ISR(PCINT0_vect) {
+    if (PINB & _BV(PB0)) {
+    } else {
+        _delay_us(10);
+        UDR0 = 0x00;    // send end-of-row delimiter
+        y_byte = true;  // pattern is YUYV
     }
 }
 
 ISR(INT0_vect) {
-    rows += 1;
+    if (y_byte) {  // ignore U/V bytes
+        uint8_t byte = (PIND & DATA_7_4_MASK) | (PINC & DATA_3_0_MASK);
+        UDR0 = byte | 0x01;  // force != 0 to allow 0 as delimiter
+    }
+    y_byte = !y_byte;
 }
 
 ISR(INT1_vect) {
-    frames += 1;
+    // vsync
 }

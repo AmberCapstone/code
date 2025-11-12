@@ -1,2 +1,0 @@
--e file://../../../lib/python/cobs
-pyserial==3.5

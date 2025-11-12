@@ -15,7 +15,7 @@ static uint16_t tx_index;
 void Initialize(void) {
     // BAUD = F_CPU / (8 * UBRR) - 1
     UBRR0H = 0;
-    UBRR0L = 7;           // 0 = 2M, 1 = 1M, 3 = 500K, 7 = 250K
+    UBRR0L = 0;           // 0 = 2M, 1 = 1M, 3 = 500K, 7 = 250K
     UCSR0A |= _BV(U2X0);  // 2x speed asynchronous UART
 
     // enable TX and RX (also configures pins)
