@@ -42,6 +42,7 @@ struct Driver {
 
     enum class Frequency : uint8_t { MHZ_433, MHZ_915 };
     enum class Direction : uint8_t { TX, RX };
+    enum class TestMode : uint8_t { UNMOD, MOD };
 
     Driver(const SPIClass&, const pin::DigitalInput&, pin::DigitalOutput&);
     ~Driver() = default;
