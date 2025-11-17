@@ -3,41 +3,40 @@
 #include <SPI.h>
 #include "digital.hpp"
 
-namespace cc1101 {
+namespace amber::cc1101 {
 
-namespace {
+enum class Register : uint8_t {
 
-// CC1101 Register Addresses
-constexpr uint8_t IOCFG0   = 0x02;
-constexpr uint8_t FREQ2    = 0x0D;
-constexpr uint8_t FREQ1    = 0x0E;
-constexpr uint8_t FREQ0    = 0x0F;
-constexpr uint8_t MDMCFG4  = 0x10;
-constexpr uint8_t MDMCFG3  = 0x11;
-constexpr uint8_t MDMCFG2  = 0x12;
-constexpr uint8_t DEVIATN  = 0x15;
-constexpr uint8_t MCSM0    = 0x18;
-constexpr uint8_t FOCCFG   = 0x19;
-constexpr uint8_t AGCCTRL2 = 0x17;
-constexpr uint8_t FREND0   = 0x22;
-constexpr uint8_t FSCAL3   = 0x23;
-constexpr uint8_t FSCAL2   = 0x24;
-constexpr uint8_t FSCAL1   = 0x25;
-constexpr uint8_t FSCAL0   = 0x26;
-constexpr uint8_t TEST2    = 0x2C;
-constexpr uint8_t TEST1    = 0x2D;
-constexpr uint8_t TEST0    = 0x2E;
-constexpr uint8_t PATABLE  = 0x3E;
+    // CC1101 Register Addresses
+    IOCFG0 = 0x02,
+    FREQ2 = 0x0D,
+    FREQ1 = 0x0E,
+    FREQ0 = 0x0F,
+    MDMCFG4 = 0x10,
+    MDMCFG3 = 0x11,
+    MDMCFG2 = 0x12,
+    DEVIATN = 0x15,
+    MCSM0 = 0x18,
+    FOCCFG = 0x19,
+    AGCCTRL2 = 0x17,
+    FREND0 = 0x22,
+    FSCAL3 = 0x23,
+    FSCAL2 = 0x24,
+    FSCAL1 = 0x25,
+    FSCAL0 = 0x26,
+    TEST2 = 0x2C,
+    TEST1 = 0x2D,
+    TEST0 = 0x2E,
+    PATABLE = 0x3E,
 
-// Command Strobes
-constexpr uint8_t SRES  = 0x30;
-constexpr uint8_t SNOP  = 0x3D;
-constexpr uint8_t SCAL  = 0x33;
-constexpr uint8_t SRX   = 0x34;
-constexpr uint8_t STX   = 0x35;
-constexpr uint8_t SIDLE = 0x36;
-
-}; // namespace reg
+    // Command Strobes
+    SRES = 0x30,
+    SNOP = 0x3D,
+    SCAL = 0x33,
+    SRX = 0x34,
+    STX = 0x35,
+    SIDLE = 0x36,
+};
 
 struct Driver {
 
@@ -53,12 +52,12 @@ struct Driver {
 
 private:
 
-    auto writeStrobe(const uint8_t) noexcept -> void;
-    auto writeRegister(const uint8_t, const uint8_t) noexcept -> void;
+    auto writeStrobe(const Register) noexcept -> void;
+    auto writeRegister(const Register, const uint8_t) noexcept -> void;
 
     const SPIClass& _spi;
     const pin::DigitalInput& _miso;
     pin::DigitalOutput& _cs;
 };
 
-} // namespace cc1101
+} // namespace amber::cc1101
