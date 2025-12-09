@@ -1,5 +1,7 @@
 #include "m25pe.hpp"
 
+#include <cstdint>
+
 #include "spi_master.hpp"
 
 namespace amber::m25pe {
