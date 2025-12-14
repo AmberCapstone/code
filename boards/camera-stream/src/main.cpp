@@ -71,7 +71,7 @@ int main(void) {
         {ov7670::reg::COM14, 0x00},  // No manual scaling, PCLK divider = 1
         {ov7670::reg::COM10, 0x20},
         {ov7670::reg::SCALING_XSC, 0x3A},
-        {ov7670::reg::SCALING_YSC, 0x35},
+        {ov7670::reg::SCALING_YSC, 0x35 | 0x80},  // 8-bar color bar
         {ov7670::reg::SCALING_DCWCTR, 0x11},
         {ov7670::reg::SCALING_PCLK_DIV, 0xF0},
         {ov7670::reg::SCALING_PCLK_DELAY, 0x02},
