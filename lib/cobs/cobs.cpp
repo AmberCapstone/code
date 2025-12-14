@@ -1,7 +1,7 @@
 #include "cobs.hpp"
 
-#include <cstdint>
-#include <cstdlib>
+#include <stdint.h>
+#include <stdlib.h>
 
 namespace amber::cobs {
 
@@ -31,13 +31,6 @@ bool Decoder::Decode(const uint8_t* encoded, size_t encoded_length) {
         }
     }
     return false;
-}
-
-constexpr size_t MaxEncodedLength(size_t raw_length) {
-    constexpr size_t LEADING_ZERO = 1;
-    constexpr size_t TERMINATING_ZERO = 1;
-    size_t MAX_STUFF_BYTES = (raw_length + 253) / 254;
-    return LEADING_ZERO + raw_length + MAX_STUFF_BYTES + TERMINATING_ZERO;
 }
 
 size_t Encode(const uint8_t* raw, size_t length, uint8_t* output) {
