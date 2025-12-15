@@ -1,0 +1,29 @@
+edition = "2023";
+
+package spi_flash;
+
+message Command {
+    uint32 value = 1;
+}
+
+enum State {
+    UNKNOWN = 0;
+    IDLE = 1;
+    RECEIVING = 2;
+    WRITING = 3;
+    READING = 4;
+    ERASING = 5;
+}
+
+message Status {
+    // Diagnostics
+    uint32 tx_counter = 1;
+    uint32 rx_counter = 2;
+    int32 temperature_degc = 3;
+    int32 vbat_mv = 4;
+    int32 vrefint_mv = 5;
+
+    State state = 6;
+
+    uint32 echo = 7;
+}

@@ -57,8 +57,14 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define LED_Pin GPIO_PIN_5
-#define LED_GPIO_Port GPIOA
+#define LD4_Pin GPIO_PIN_5
+#define LD4_GPIO_Port GPIOA
+#define M25_nWRITE_PROTECT_Pin GPIO_PIN_7
+#define M25_nWRITE_PROTECT_GPIO_Port GPIOC
+#define M25_nRESET_Pin GPIO_PIN_9
+#define M25_nRESET_GPIO_Port GPIOA
+#define M25_nCHIP_SELECT_Pin GPIO_PIN_6
+#define M25_nCHIP_SELECT_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

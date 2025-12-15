@@ -1,0 +1,4 @@
+pyserial
+protobuf
+textual
+-e ../../../lib/python/cobs

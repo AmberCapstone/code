@@ -68,8 +68,8 @@ static int8_t CDC_Control(uint8_t cmd, uint8_t* pbuf, uint16_t length);
 static int8_t CDC_Receive(uint8_t* pbuf, uint32_t* Len);
 static int8_t CDC_TransmitCplt(uint8_t* pbuf, uint32_t* Len, uint8_t epnum);
 
-USBD_CDC_ItfTypeDef USBD_CDC_Template_fops = {CDC_Init, CDC_DeInit, CDC_Control,
-                                              CDC_Receive, CDC_TransmitCplt};
+USBD_CDC_ItfTypeDef USBD_CDC_fops = {CDC_Init, CDC_DeInit, CDC_Control,
+                                     CDC_Receive, CDC_TransmitCplt};
 
 USBD_CDC_LineCodingTypeDef linecoding = {
     115200, /* baud rate*/
@@ -194,9 +194,17 @@ static int8_t CDC_Control(uint8_t cmd, uint8_t* pbuf, uint16_t length) {
  * @retval Result of the operation: USBD_OK if all operations are OK else
  * USBD_FAIL
  */
+extern uint8_t rx_buffer[1024];
+extern uint16_t rx_buf_count;
+
 static int8_t CDC_Receive(uint8_t* Buf, uint32_t* Len) {
     USBD_CDC_ReceivePacket(&hUsbDeviceFS);
-    return (USBD_OK);
+
+    // this is not great yet. could overflow. might have race conditions
+    memcpy(rx_buffer, Buf, *Len);
+    rx_buf_count += *Len;
+
+    return USBD_OK;
 }
 
 uint8_t CDC_Transmit(uint8_t* Buf, uint16_t Len) {

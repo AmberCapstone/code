@@ -60,8 +60,7 @@ void MX_USB_PCD_Init(void) {
         Error_Handler();
     }
 
-    if (USBD_CDC_RegisterInterface(&hUsbDeviceFS, &USBD_CDC_Template_fops) !=
-        USBD_OK) {
+    if (USBD_CDC_RegisterInterface(&hUsbDeviceFS, &USBD_CDC_fops) != USBD_OK) {
         Error_Handler();
     }
 

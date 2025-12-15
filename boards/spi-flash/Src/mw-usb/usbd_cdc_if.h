@@ -32,7 +32,7 @@ extern "C" {
 #define APP_RX_DATA_SIZE 2048
 #define APP_TX_DATA_SIZE 2048
 
-extern USBD_CDC_ItfTypeDef USBD_CDC_Template_fops;
+extern USBD_CDC_ItfTypeDef USBD_CDC_fops;
 
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */

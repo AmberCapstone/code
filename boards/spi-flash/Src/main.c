@@ -19,16 +19,17 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+#include "adc.h"
+#include "cmsis_os2.h"
+#include "dma.h"
 #include "gpio.h"
+#include "spi.h"
+#include "tim.h"
 #include "usb.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdbool.h>
-
-#include "usbd_cdc_if.h"
-#include "usbd_core.h"
-
+#include "tasks.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,11 +50,12 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-extern USBD_HandleTypeDef hUsbDeviceFS;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -92,27 +94,28 @@ int main(void) {
 
     /* Initialize all configured peripherals */
     MX_GPIO_Init();
+    MX_DMA_Init();
     MX_USB_PCD_Init();
+    MX_SPI1_Init();
+    MX_ADC1_Init();
+    MX_TIM6_Init();
     /* USER CODE BEGIN 2 */
-
-    // Wait for USB initialization to complete
-    while (hUsbDeviceFS.pClassData == NULL) {
-        // prevent compiler from optimizing out the loop condition
-        asm("nop");
-    }
 
     /* USER CODE END 2 */
 
+    /* Init scheduler */
+    osKernelInitialize();
+    /* Call init function for freertos objects (in app_freertos.c) */
+    MX_FREERTOS_Init();
+
+    /* Start scheduler */
+    osKernelStart();
+
+    /* We should never get here as control is now taken by the scheduler */
+
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
-    uint8_t tx_counter = 0;
-    uint8_t buffer[100] = "";
-    while (true) {
-        uint16_t len =
-            sprintf((char*)buffer, "The counter is %d\n", tx_counter++);
-        HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-        CDC_Transmit(buffer, len);
-        HAL_Delay(500);
+    while (1) {
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */

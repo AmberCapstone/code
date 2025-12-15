@@ -1,4 +1,4 @@
-# STM32U0 USB Demo
+# STM32U0 SPI Flash with M25PE
 
 ## Setup
 
@@ -6,7 +6,7 @@
 git submodule update --init --recursive
 ```
 
-Open `u0-usb-demo.ioc` in CubeMX and click "Generate Code" to generate the `Drivers/` folder, then run `. post_cubemx.sh`.
+Open `spi-flash.ioc` in CubeMX and click "Generate Code" to generate the `Drivers/` folder, then run `. post_cubemx.sh`.
 
 ## Usage
 
@@ -19,15 +19,19 @@ Break out a USB wire and connect to a Nucleo-U083RC
 | GND  | GND   |
 | VBUS | N.C.  |
 
+Connect the M25PE SPI flash to the Nucleo.
+
+|  SPI   | STM32 | Description  |
+|:-------|:------|:-------------|
+| 1 nS   | PB6   | Chip Select  |
+| 2 Q    | PA6   | MISO         |
+| 3 nW   | PC7   | Write Protect|
+| 4 VSS  | GND   | Ground       |
+| 5 D    | PA7   | MOSI         |
+| 6 C    | PB3   | SCK          |
+| 7 nRST | PA9   | Reset        |
+| 8 VCC  | 3.3V  | Supply Volt  |
+
 Flash the code to the Nucleo `pio run -t upload`.
 
 Open a Serial Monitor. You should see an `amber` device. Connect to it and start monitoring. Baud rate doesn't matter for USB serial.
-
-```text
----- Opened the serial port /dev/ttyACM1 - amber ----
-The counter is 8
-The counter is 9
-The counter is 10
-The counter is 11
-The counter is 12
-```
