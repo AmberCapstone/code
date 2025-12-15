@@ -1,6 +1,10 @@
 #include "m25pe.hpp"
 
+#if __has_include(<cstdint>)
 #include <cstdint>
+#else
+#include <stdint.h>
+#endif
 
 #include "spi_master.hpp"
 

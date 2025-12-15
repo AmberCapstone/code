@@ -1,7 +1,16 @@
 #pragma once
 
+#if __has_include(<cstdint>)
+#include <cstdint>
+#else
 #include <stdint.h>
+#endif
+
+#if __has_include(<cstdlib>)
+#include <cstdlib>
+#else
 #include <stdlib.h>
+#endif
 
 namespace amber::cobs {
 
@@ -16,6 +25,7 @@ class Decoder {
 public:
     Decoder(uint8_t* buffer);
     bool Decode(const uint8_t* encoded, size_t encoded_length);
+    void Reset(void);
 
     uint8_t* buffer;
     size_t length;

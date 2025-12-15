@@ -5,8 +5,15 @@
 
 namespace amber::cobs {
 
-Decoder::Decoder(uint8_t* buffer)
-    : buffer(buffer), length(0), block_remaining_(0), code_(0xff) {}
+Decoder::Decoder(uint8_t* buffer) : buffer(buffer) {
+    Reset();
+}
+
+void Decoder::Reset() {
+    length = 0;
+    block_remaining_ = 0;
+    code_ = 0xff;
+}
 
 bool Decoder::Decode(const uint8_t* encoded, size_t encoded_length) {
     // adapted from
