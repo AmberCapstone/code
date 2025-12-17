@@ -25,7 +25,14 @@ bool Decoder::Decode(const uint8_t* encoded, size_t encoded_length) {
 
     for (; input_cursor < encoded + encoded_length; --block_remaining_) {
         if (block_remaining_ > 0) {
-            buffer[length++] = *input_cursor++;
+            uint8_t byte = *input_cursor++;
+            if (byte == 0) {
+                // block_remaining_ was incorrect. Reset to contain error to
+                // this packet
+                Reset();
+                return false;
+            }
+            buffer[length++] = byte;
         } else {
             block_remaining_ = *input_cursor++;
             if (block_remaining_ == 0) {
