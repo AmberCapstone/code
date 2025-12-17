@@ -61,6 +61,7 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 /** @defgroup USBD_CDC_Private_FunctionPrototypes
  * @{
  */
+extern void SerialReceiveBytes(uint8_t* bytes, uint32_t len);
 
 static int8_t CDC_Init(void);
 static int8_t CDC_DeInit(void);
@@ -194,15 +195,11 @@ static int8_t CDC_Control(uint8_t cmd, uint8_t* pbuf, uint16_t length) {
  * @retval Result of the operation: USBD_OK if all operations are OK else
  * USBD_FAIL
  */
-extern uint8_t rx_buffer[1024];
-extern uint16_t rx_buf_count;
 
 static int8_t CDC_Receive(uint8_t* Buf, uint32_t* Len) {
     USBD_CDC_ReceivePacket(&hUsbDeviceFS);
 
-    // this is not great yet. could overflow. might have race conditions
-    memcpy(rx_buffer, Buf, *Len);
-    rx_buf_count += *Len;
+    SerialReceiveBytes(Buf, *Len);
 
     return USBD_OK;
 }

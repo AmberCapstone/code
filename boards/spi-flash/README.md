@@ -34,4 +34,4 @@ Connect the M25PE SPI flash to the Nucleo.
 
 Flash the code to the Nucleo `pio run -t upload`.
 
-Open a Serial Monitor. You should see an `amber` device. Connect to it and start monitoring. Baud rate doesn't matter for USB serial.
+Run `app/main.py` to connect to the device.
