@@ -9,7 +9,7 @@ namespace sensors {
 
 // Behaviour
 void Init(void);
-void Update_10Hz(void);
+void Update_10hz(void);
 
 // Accessors
 int32_t GetTemperatureC(void);

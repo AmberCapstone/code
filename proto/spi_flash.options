@@ -1,1 +1,1 @@
-spi_flash.* long_names: true
+spi_flash.* long_names: false

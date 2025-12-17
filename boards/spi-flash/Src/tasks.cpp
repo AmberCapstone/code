@@ -11,6 +11,7 @@
 #include "flash/flash.hpp"
 #include "sensors/sensors.hpp"
 #include "serial/serial.hpp"
+#include "state_machine/state_machine.hpp"
 
 // FreeRTOS
 #include "FreeRTOS.h"
@@ -35,6 +36,7 @@ void task_1000hz(void* argument) {
 
     while (true) {
         serial::Receive();
+        state_machine::Update_1khz();
 
         xTaskDelayUntil(&wake_time, pdMS_TO_TICKS(1));
     }
@@ -45,7 +47,7 @@ void task_10hz(void* argument) {
     TickType_t wake_time = xTaskGetTickCount();
 
     while (true) {
-        sensors::Update_10Hz();
+        sensors::Update_10hz();
         serial::SendStatus();
 
         HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
@@ -54,9 +56,10 @@ void task_10hz(void* argument) {
 }
 
 void MX_FREERTOS_Init() {
-    flash::Init();
     serial::Init();
+    flash::Init();
     sensors::Init();
+    state_machine::Init();
 
     xTaskCreateStatic(task_1000hz, "1000Hz", STACK_SIZE_WORDS, NULL,
                       PRIORITY_1000HZ, t1000hz_stack, &t1000hz_ctrl);

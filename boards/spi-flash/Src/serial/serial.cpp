@@ -3,6 +3,7 @@
 #include "cobs.hpp"
 #include "common_macros.hpp"
 #include "sensors/sensors.hpp"
+#include "state_machine/state_machine.hpp"
 
 // Proto
 #include "pb_decode.h"
@@ -72,11 +73,10 @@ void SendStatus(void) {
         .tx_counter = tx_counter++,
         .has_rx_counter = true,
         .rx_counter = rx_counter,
-        .has_echo = last_command.has_value,
-        .echo = last_command.value,
     };
 
     sensors::PopulateStatus(&status);
+    state_machine::PopulateStatus(&status);
 
     pb_ostream_s ostream =
         pb_ostream_from_buffer(pb_buffer, COUNTOF(pb_buffer));
@@ -90,6 +90,11 @@ void SendStatus(void) {
 
 void HandleCommand(spi_flash_command_t* cmd) {
     rx_counter++;
+
+    if (cmd->has_action) {
+        state_machine::HandleAction(cmd->action);
+    }
+
     last_command = *cmd;
 }
 

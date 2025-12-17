@@ -4,11 +4,11 @@ import serial.tools.list_ports
 import cobs
 from google.protobuf import json_format
 from textual.app import App, ComposeResult
-from textual.widgets import Label, Pretty
+from textual.widgets import Label, Pretty, Button
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 
-from proto.spi_flash_pb2 import Status, Command
+from proto.spi_flash_pb2 import Status, Command, State, Action
 
 
 class TUI(App):
@@ -40,6 +40,9 @@ class TUI(App):
             with Vertical(classes="box"):
                 yield Label("Command")
                 yield Pretty("command", id="lab-cmd")
+                with Horizontal():
+                    yield Button("Flash", id="btn-flash")
+                    yield Button("Readout", id="btn-readout")
             with Vertical(classes="box"):
                 yield Label("Status")
                 yield Pretty("status", id="lab-sts")
@@ -55,6 +58,9 @@ class TUI(App):
         self.status.ParseFromString(decoder.output)
         self.d_status = json_format.MessageToDict(self.status)
 
+        if self.status.state != State.STATE_IDLE:
+            self.command.action = Action.ACTION_NONE
+
     def watch_d_command(self, value: str) -> None:
         self.query_exactly_one("#lab-cmd", Pretty).update(value)
 
@@ -62,10 +68,16 @@ class TUI(App):
         self.query_exactly_one("#lab-sts", Pretty).update(value)
 
     def write(self):
-        self.command.value += 5
         b = cobs.Encode(self.command.SerializeToString())
         self.serial.write(b)
         self.d_command = json_format.MessageToDict(self.command)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        match event.button.id:
+            case "btn-flash":
+                self.command.action = Action.ACTION_FLASH
+            case "btn-readout":
+                self.command.action = Action.ACTION_READOUT
 
 
 if __name__ == "__main__":

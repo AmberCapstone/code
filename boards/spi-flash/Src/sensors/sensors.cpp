@@ -26,7 +26,7 @@ void Init(void) {
     HAL_ADCEx_Calibration_Start(&hadc1);
 }
 
-void Update_10Hz(void) {
+void Update_10hz(void) {
     vrefint_mv = __HAL_ADC_CALC_VREFANALOG_VOLTAGE(raw_adc[0], RESOLUTION);
     temperature_degc =
         __HAL_ADC_CALC_TEMPERATURE(vrefint_mv, raw_adc[1], RESOLUTION);

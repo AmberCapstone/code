@@ -2,18 +2,32 @@ edition = "2023";
 
 package spi_flash;
 
-message Command {
-    uint32 value = 1;
+message Page {
+    uint32 page_number = 1;
+    fixed32 data_crc = 2;
+    bytes data = 3;
+}
+
+enum Action {
+    ACTION_NONE = 0;
+    ACTION_FLASH = 1;
+    ACTION_READOUT = 2;
 }
 
 enum State {
-    UNKNOWN = 0;
-    IDLE = 1;
-    RECEIVING = 2;
-    WRITING = 3;
-    READING = 4;
-    ERASING = 5;
+    STATE_UNKNOWN = 0;
+    STATE_IDLE = 1;
+    STATE_FLASHING = 2;
+    STATE_READOUT = 3;
 }
+
+message Command {
+    Action action = 1;
+    Page page = 2;
+
+    uint32 page_request = 3; // ONLY USED IN READOUT
+}
+
 
 message Status {
     // Diagnostics
@@ -25,5 +39,5 @@ message Status {
 
     State state = 6;
 
-    uint32 echo = 7;
+    uint32 page_request = 7; // only used in FLASHING
 }
