@@ -1,6 +1,6 @@
 #pragma once
 
-#include "spi_flash.pb.h"
+#include "sensor.pb.h"
 
 // CubeMX
 #include "adc.h"
@@ -15,6 +15,6 @@ void Update_10hz(void);
 int32_t GetTemperatureC(void);
 int32_t GetVrefintMv(void);
 int32_t GetVbatMv(void);
-void PopulateStatus(spi_flash_status_t* msg);
+void PopulateStatus(sensor_status_t* msg);
 
 }  // namespace sensors

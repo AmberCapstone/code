@@ -1,6 +1,6 @@
 #pragma once
 
-#include "spi_flash.pb.h"
+#include "sensor.pb.h"
 
 namespace serial {
 

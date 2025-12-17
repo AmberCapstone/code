@@ -2,5 +2,5 @@
 	path = boards/u0-usb-demo/stm32-mw-usb-device
 	url = https://github.com/STMicroelectronics/stm32-mw-usb-device.git
 [submodule "boards/spi-flash/stm32-mw-usb-device"]
-	path = boards/spi-flash/stm32-mw-usb-device
+	path = boards/sensor/stm32-mw-usb-device
 	url = https://github.com/STMicroelectronics/stm32-mw-usb-device.git

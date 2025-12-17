@@ -1,6 +1,6 @@
 edition = "2023";
 
-package spi_flash;
+package sensor;
 
 message Page {
     uint32 page_number = 1;
@@ -21,11 +21,19 @@ enum State {
     STATE_READOUT = 3;
 }
 
+enum FlashState {
+    FLASH_STATE_UNKNOWN = 0;
+    FLASH_STATE_ERASING = 1;
+    FLASH_STATE_WRITING = 2;
+    FLASH_STATE_VERIFYING = 3;
+    FLASH_STATE_DONE = 4;
+}
+
 message Command {
     Action action = 1;
     Page page = 2;
 
-    uint32 page_request = 3; // ONLY USED IN READOUT
+    uint32 page_request = 3; // only used in STATE_READOUT
 }
 
 
@@ -39,5 +47,8 @@ message Status {
 
     State state = 6;
 
-    uint32 page_request = 7; // only used in FLASHING
+    // Only used in STATE_FLASHING
+    FlashState flash_state = 7;
+    uint32 page_request = 8;
+
 }

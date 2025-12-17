@@ -1,6 +1,6 @@
 #pragma once
 
-#include "spi_flash.pb.h"
+#include "sensor.pb.h"
 
 namespace state_machine {
 
@@ -9,9 +9,10 @@ void Init(void);
 void Update_1khz(void);
 
 // Accessors
-void PopulateStatus(spi_flash_status_t* msg);
+sensor_state_t GetState(void);
+void PopulateStatus(sensor_status_t* msg);
 
 // Modifiers
-void HandleAction(spi_flash_action_t action);
+void HandleAction(sensor_action_t action);
 
 }  // namespace state_machine

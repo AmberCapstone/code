@@ -8,7 +8,7 @@
 // Proto
 #include "pb_decode.h"
 #include "pb_encode.h"
-#include "spi_flash.pb.h"
+#include "sensor.pb.h"
 
 // USB
 #include "usbd_cdc_if.h"
@@ -34,32 +34,29 @@ static amber::cobs::Decoder rx_decoder(decoded_buffer);
 
 // TX State
 static uint8_t tx_counter = 0;
-static uint8_t pb_buffer[SPI_FLASH_STATUS_SIZE];
-static uint8_t
-    cobs_buffer[amber::cobs::MaxEncodedLength(SPI_FLASH_STATUS_SIZE)];
+static uint8_t pb_buffer[SENSOR_STATUS_SIZE];
+static uint8_t cobs_buffer[amber::cobs::MaxEncodedLength(SENSOR_STATUS_SIZE)];
 
-static spi_flash_command_t last_command;
+static sensor_command_t last_command;
 
-static void HandleCommand(spi_flash_command_t* cmd);
+static void HandleCommand(sensor_command_t* cmd);
 
 void Init(void) {
     // Wait for USB initialization to complete
-    while (hUsbDeviceFS.pClassData == NULL) {
-        // prevent compiler from optimizing out the loop condition
-        asm("nop");
-    }
+    while (((volatile USBD_HandleTypeDef*)hUsbDeviceFS.pClassData) == NULL);
 }
 
 void Receive(void) {
     if (rx_buf_count == 0) {
+        // No data, nothing to do.
         return;
     }
 
     if (rx_decoder.Decode(rx_buffer, rx_buf_count)) {
         pb_istream_s istream =
             pb_istream_from_buffer(rx_decoder.buffer, rx_decoder.length);
-        spi_flash_command_t cmd;
-        if (pb_decode(&istream, &spi_flash_command_t_msg, &cmd)) {
+        sensor_command_t cmd;
+        if (pb_decode(&istream, &sensor_command_t_msg, &cmd)) {
             HandleCommand(&cmd);
         }
         rx_decoder.Reset();
@@ -68,7 +65,7 @@ void Receive(void) {
 }
 
 void SendStatus(void) {
-    spi_flash_status_t status{
+    sensor_status_t status{
         .has_tx_counter = true,
         .tx_counter = tx_counter++,
         .has_rx_counter = true,
@@ -81,14 +78,14 @@ void SendStatus(void) {
     pb_ostream_s ostream =
         pb_ostream_from_buffer(pb_buffer, COUNTOF(pb_buffer));
 
-    if (pb_encode(&ostream, &spi_flash_status_t_msg, &status)) {
+    if (pb_encode(&ostream, &sensor_status_t_msg, &status)) {
         int len =
             amber::cobs::Encode(pb_buffer, ostream.bytes_written, cobs_buffer);
         CDC_Transmit(cobs_buffer, len);
     }
 }
 
-void HandleCommand(spi_flash_command_t* cmd) {
+void HandleCommand(sensor_command_t* cmd) {
     rx_counter++;
 
     if (cmd->has_action) {

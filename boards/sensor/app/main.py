@@ -1,14 +1,19 @@
+import subprocess
 import time
+
+import cobs
 import serial
 import serial.tools.list_ports
-import cobs
 from google.protobuf import json_format
 from textual.app import App, ComposeResult
-from textual.widgets import Label, Pretty, Button
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
+from textual.widgets import Button, Label, Pretty
 
-from proto.spi_flash_pb2 import Status, Command, State, Action
+if subprocess.call(["sh", "generate_proto.sh"]) != 0:
+    exit(1)
+
+from proto.sensor_pb2 import Action, Command, State, Status
 
 
 class TUI(App):

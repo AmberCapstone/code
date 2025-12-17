@@ -50,7 +50,7 @@ int32_t GetVbatMv(void) {
     return vbat_mv;
 }
 
-void PopulateStatus(spi_flash_status_t* msg) {
+void PopulateStatus(sensor_status_t* msg) {
     msg->has_temperature_degc = true;
     msg->temperature_degc = sensors::GetTemperatureC();
     msg->has_vbat_mv = true;
