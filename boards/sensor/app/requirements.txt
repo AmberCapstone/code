@@ -1,4 +1,5 @@
 pyserial
 protobuf
 textual
+textual-fspicker
 -e ../../../lib/python/cobs

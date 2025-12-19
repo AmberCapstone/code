@@ -38,7 +38,7 @@ void task_1000hz(void* argument) {
         serial::Receive();
         state_machine::Update_1khz();
 
-        xTaskDelayUntil(&wake_time, pdMS_TO_TICKS(1));
+        xTaskDelayUntil(&wake_time, pdMS_TO_TICKS(10));
     }
 }
 
@@ -50,8 +50,7 @@ void task_10hz(void* argument) {
         sensors::Update_10hz();
         serial::SendStatus();
 
-        HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
-        xTaskDelayUntil(&wake_time, pdMS_TO_TICKS(100));
+        xTaskDelayUntil(&wake_time, pdMS_TO_TICKS(15));
     }
 }
 

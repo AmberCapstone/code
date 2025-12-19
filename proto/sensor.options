@@ -1,5 +1,0 @@
-sensor.* long_names: false
-
-# Page.data size should match Src/flash::PAGE_SIZE
-sensor.Page.data max_size: 256
-sensor.Page.data fixed_length: true

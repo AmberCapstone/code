@@ -197,9 +197,9 @@ static int8_t CDC_Control(uint8_t cmd, uint8_t* pbuf, uint16_t length) {
  */
 
 static int8_t CDC_Receive(uint8_t* Buf, uint32_t* Len) {
-    USBD_CDC_ReceivePacket(&hUsbDeviceFS);
-
     SerialReceiveBytes(Buf, *Len);
+
+    USBD_CDC_ReceivePacket(&hUsbDeviceFS);
 
     return USBD_OK;
 }

@@ -2,11 +2,7 @@ edition = "2023";
 
 package sensor;
 
-message Page {
-    uint32 page_number = 1;
-    fixed32 data_crc = 2;
-    bytes data = 3;
-}
+import "flash.proto";
 
 enum Action {
     ACTION_NONE = 0;
@@ -21,19 +17,13 @@ enum State {
     STATE_READOUT = 3;
 }
 
-enum FlashState {
-    FLASH_STATE_UNKNOWN = 0;
-    FLASH_STATE_ERASING = 1;
-    FLASH_STATE_WRITING = 2;
-    FLASH_STATE_VERIFYING = 3;
-    FLASH_STATE_DONE = 4;
-}
-
 message Command {
     Action action = 1;
-    Page page = 2;
+    flash.Page page = 2;
 
     uint32 page_request = 3; // only used in STATE_READOUT
+
+    uint32 tx_number = 5;
 }
 
 
@@ -48,7 +38,15 @@ message Status {
     State state = 6;
 
     // Only used in STATE_FLASHING
-    FlashState flash_state = 7;
-    uint32 page_request = 8;
+    flash.Status flash_status = 7;
 
+    uint32 last_msg_size = 11;
+    uint32 rx_buf_count = 12;
+    uint32 failed_crc = 14;
+    uint32 micros = 13;
+
+    Action last_action = 15;
+
+    uint32 received_bytes = 16;
+    uint32 decoded_bytes = 17;
 }

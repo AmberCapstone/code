@@ -21,6 +21,7 @@
 
 #include "adc.h"
 #include "cmsis_os2.h"
+#include "crc.h"
 #include "dma.h"
 #include "gpio.h"
 #include "spi.h"
@@ -99,6 +100,8 @@ int main(void) {
     MX_SPI1_Init();
     MX_ADC1_Init();
     MX_TIM6_Init();
+    MX_CRC_Init();
+    MX_TIM7_Init();
     /* USER CODE BEGIN 2 */
 
     /* USER CODE END 2 */

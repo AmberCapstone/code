@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <optional>
 
+#include "flash.pb.h"
+#include "flash/flash.hpp"
 #include "sensor.pb.h"
 
 namespace state_machine {
@@ -38,7 +40,11 @@ void Update_1khz(void) {
             break;
 
         case SENSOR_STATE_FLASHING:
-            if (state_elapsed_ms > 3000) {
+            if (on_enter) {
+                flash::Start();
+            }
+
+            if (flash::IsDone()) {
                 Transition(SENSOR_STATE_IDLE);
             }
             break;

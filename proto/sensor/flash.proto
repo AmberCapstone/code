@@ -1,0 +1,24 @@
+edition = "2023";
+
+package sensor.flash;
+
+message Page {
+    uint32 page_number = 1;
+    bytes data = 2;
+    fixed32 crc = 3; // CRC32 of page_number (4 bytes, little-endian) then data (256 bytes)
+}
+
+enum State {
+    STATE_UNKNOWN = 0;
+    STATE_IDLE = 1;
+    STATE_ERASING = 2;
+    STATE_WRITING = 3;
+    STATE_VERIFYING = 4;
+    STATE_DONE = 5;
+}
+
+message Status {
+    State state = 1;
+    uint32 page_request = 2;
+    fixed32 last_crc = 3;
+}
