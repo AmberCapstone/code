@@ -17,9 +17,9 @@ inline void SendCommand(SpiMaster& spi, Command command) {
 
 static inline void SendAddress(SpiMaster& spi, uint32_t address) {
     uint8_t tx[3] = {
-        static_cast<uint8_t>(address | 0x0000ff),
-        static_cast<uint8_t>((address >> 8) | 0x00ff00),
-        static_cast<uint8_t>((address >> 16) | 0xff0000),
+        static_cast<uint8_t>((address >> 16) & 0xff),
+        static_cast<uint8_t>((address >> 8) & 0xff),
+        static_cast<uint8_t>(address & 0xff),
     };
     spi.Transmit(tx, 3);
 }
@@ -112,4 +112,15 @@ void BulkErase(SpiMaster& spi) {
     spi.SetChipSelect(true);
 }
 
+uint32_t ReadIdentification(SpiMaster& spi) {
+    uint8_t bytes[3];
+
+    spi.SetChipSelect(false);
+    SendCommand(spi, Command::READ_IDENTIFICATION);
+    spi.Receive(bytes, 3);
+    spi.SetChipSelect(true);
+
+    uint32_t out = bytes[0] << 16 | bytes[1] << 8 | bytes[2];
+    return out;
+}
 }  // namespace amber::m25pe

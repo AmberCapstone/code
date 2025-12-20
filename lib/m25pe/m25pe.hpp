@@ -92,4 +92,10 @@ void SectorErase(SpiMaster& spi, uint32_t address);
 // Set all bits to 1
 void BulkErase(SpiMaster& spi);
 
+// Three bytes
+// `u32 & 0xff` = Memory capacity
+// `(u32 >> 8) & 0xff` = Memory Type
+// `(u32 >> 16) & 0xff` = Manufacturer
+uint32_t ReadIdentification(SpiMaster& spi);
+
 }  // namespace amber::m25pe
