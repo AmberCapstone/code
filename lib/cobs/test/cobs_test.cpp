@@ -23,8 +23,7 @@ TEST(COBS, ZeroString) {
     size_t enc_length_actual = Encode(decoded, dec_length, enc_output);
     EXPECT_ARRAY_EQUAL(encoded, enc_length, enc_output, enc_length_actual);
 
-    uint8_t dec_output[256];
-    Decoder decoder(dec_output);
+    Decoder<256> decoder;
     EXPECT_TRUE(decoder.Decode(encoded, enc_length));
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
 }
@@ -40,8 +39,7 @@ TEST(COBS, EmptyString) {
     size_t enc_length_actual = Encode(decoded, dec_length, enc_output);
     EXPECT_ARRAY_EQUAL(encoded, enc_length, enc_output, enc_length_actual);
 
-    uint8_t dec_output[256];
-    Decoder decoder(dec_output);
+    Decoder<256> decoder;
     EXPECT_TRUE(decoder.Decode(encoded, enc_length));
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
 }
@@ -57,8 +55,7 @@ TEST(COBS, Short) {
     size_t enc_length_actual = Encode(decoded, dec_length, enc_output);
     EXPECT_ARRAY_EQUAL(encoded, enc_length, enc_output, enc_length_actual);
 
-    uint8_t dec_output[256];
-    Decoder decoder(dec_output);
+    Decoder<256> decoder;
     EXPECT_TRUE(decoder.Decode(encoded, enc_length));
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
 }
@@ -74,8 +71,7 @@ TEST(COBS, ManyZeros) {
     size_t enc_length_actual = Encode(decoded, dec_length, enc_output);
     EXPECT_ARRAY_EQUAL(encoded, enc_length, enc_output, enc_length_actual);
 
-    uint8_t dec_output[256];
-    Decoder decoder(dec_output);
+    Decoder<256> decoder;
     EXPECT_TRUE(decoder.Decode(encoded, enc_length));
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
 }
@@ -135,14 +131,12 @@ TEST(COBS, FFBlock) {
     size_t enc_length_actual = Encode(decoded, dec_length, enc_output);
     EXPECT_ARRAY_EQUAL(encoded, enc_length, enc_output, enc_length_actual);
 
-    uint8_t dec_output[512] = {0};
-    Decoder decoder(dec_output);
+    Decoder<512> decoder;
     EXPECT_TRUE(decoder.Decode(encoded, enc_length));
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
 
     // Test partial decoding
-    uint8_t dec_output2[512] = {0};
-    decoder = Decoder(dec_output2);
+    decoder.Reset();
     size_t i;
     for (i = 0; i < enc_length - 50; i += 10) {
         EXPECT_FALSE(decoder.Decode(encoded + i, 10));
@@ -163,8 +157,7 @@ TEST(COBS, RecoverError) {
     uint8_t decoded[] = {0x01, 0x02, 0x03};
     size_t dec_length = sizeof(decoded) / sizeof(decoded[0]);
 
-    uint8_t decoder_output[10];
-    Decoder decoder(decoder_output);
+    Decoder<10> decoder;
     EXPECT_FALSE(decoder.Decode(packet1, p1_len));
     EXPECT_TRUE(decoder.Decode(packet2, p2_len));
     EXPECT_ARRAY_EQUAL(decoded, dec_length, decoder.buffer, decoder.length);
