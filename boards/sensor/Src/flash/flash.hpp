@@ -12,8 +12,10 @@ constexpr uint32_t NUM_PAGES =
 // Control
 void Init(void);
 void Start(void);
+void Update_1khz(void);
 
 void ReceivePage(sensor_flash_page_t* page);
+void UpdateReadoutReqNumber(int32_t req_number);
 
 // Accessors
 bool IsDone(void);

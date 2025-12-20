@@ -22,7 +22,7 @@ message Command {
     Action action = 1;
     flash.Page page = 2;
 
-    uint32 page_request = 3; // only used in STATE_READOUT
+    sint32 page_request = 3; // only used in STATE_READOUT
 }
 
 

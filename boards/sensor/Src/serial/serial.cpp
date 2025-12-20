@@ -125,6 +125,10 @@ void HandleCommand(sensor_command_t* cmd) {
         flash::ReceivePage(&cmd->page);  // 33 us
     }
 
+    if (cmd->has_page_request) {
+        flash::UpdateReadoutReqNumber(cmd->page_request);
+    }
+
     last_command = *cmd;
 }
 

@@ -41,6 +41,7 @@ void task_1000hz(void* argument) {
     while (true) {
         serial::Receive();
         state_machine::Update_1khz();
+        flash::Update_1khz();
 
         xTaskDelayUntil(&wake_time, pdMS_TO_TICKS(1));
     }

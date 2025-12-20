@@ -108,53 +108,93 @@ if __name__ == "__main__":
         ser.write(pack(Command(action=Action.ACTION_RESET)))
         time.sleep(0.1)
 
-    while status.state != State.STATE_FLASHING:
+    while (
+        status.state != State.STATE_FLASHING
+        and status.flash_status.state != flash.State.STATE_ERASING
+    ):
         ser.write(pack(Command(action=Action.ACTION_FLASH)))
         time.sleep(0.1)
 
+    print("Erasing...")
+    while status.flash_status.state == flash.State.STATE_ERASING:
+        time.sleep(0.1)
+
+    pbar = tqdm(total=TOTAL_SIZE, unit="byte", desc="Programming")
+
     last_tx_time = time.time()
-
-    pbar = tqdm(total=TOTAL_SIZE, unit="byte", desc="Flashing")
-
     sequence_number = -1
     request_number = -1
 
-    try:
-        while not stop_signal.is_set():
-            request_number = status.flash_status.page_request
+    expected_crcs = [0] * NUM_PAGES
 
-            if status.flash_status.state == flash.State.STATE_DONE:
-                stop_signal.set()
+    while status.flash_status.state == flash.State.STATE_PROGRAMMING:
+        request_number = status.flash_status.page_request
 
-            timeout = (time.time() - last_tx_time) > ARQ_TIMEOUT
-            if sequence_number < request_number or timeout:
-                if not timeout:
-                    sequence_number += 1
-                    pbar.update(PAGE_SIZE)
+        timeout = (time.time() - last_tx_time) > ARQ_TIMEOUT
+        if sequence_number < request_number or timeout:
+            if not timeout:
+                sequence_number += 1
+                pbar.update(PAGE_SIZE)
 
-                idx = sequence_number * PAGE_SIZE
-                d = bin[idx : idx + PAGE_SIZE]
-                command = Command(
-                    page=flash.Page(
-                        page_number=sequence_number,
-                        data=d,
-                        crc=binascii.crc32(sequence_number.to_bytes(4, "little") + d),
-                    )
+            idx = sequence_number * PAGE_SIZE
+            d = bin[idx : idx + PAGE_SIZE]
+            crc = binascii.crc32(sequence_number.to_bytes(4, "little") + d)
+            expected_crcs[sequence_number] = crc
+            command = Command(
+                page=flash.Page(
+                    page_number=sequence_number,
+                    data=d,
+                    crc=crc,
                 )
-                ser.write(pack(command))
-                last_tx_time = time.time()
+            )
+            ser.write(pack(command))
+            last_tx_time = time.time()
 
-            else:
-                time.sleep(0.001)
+        else:
+            time.sleep(0.002)
 
-    except KeyboardInterrupt:
-        pbar.refresh()
-        print("Aborted")
+    pbar.refresh()
+    pbar.close()
 
-    else:
-        pbar.refresh()
-        print("Done!")
+    pbar = tqdm(total=NUM_PAGES, unit="page", desc="Verifying")
 
-    finally:
-        stop_signal.set()
-        rt.join()
+    request_number = 0
+    errors = []
+    while status.flash_status.state == flash.State.STATE_VERIFYING:
+        command = Command(page_request=request_number)
+        ser.write(pack(command))
+
+        sn = status.flash_status.sequence_number
+
+        if sn >= NUM_PAGES:
+            continue
+
+        if sn == request_number:
+            request_number += 1
+            pbar.update(1)
+            if expected_crcs[sn] != status.flash_status.readout_crc:
+                errors.append(
+                    {
+                        "page": sn,
+                        "expected_crc": expected_crcs[sn],
+                        "actual_crc": status.flash_status.readout_crc,
+                    }
+                )
+
+        time.sleep(0.002)
+
+    pbar.refresh()
+    pbar.close()
+
+    print("Done!")
+
+    print(f"{len(errors)} error(s)")
+    for e in errors:
+        print(
+            f"0x{e['page']:03X} "
+            f"| {e['expected_crc']:08x} "
+            f"| {e['actual_crc']:08x}"
+        )
+
+    stop_signal.set()
+    rt.join()

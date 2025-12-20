@@ -26,6 +26,13 @@ NUM_PAGES = 16 * 16 * 2
 TOTAL_SIZE = PAGE_SIZE * NUM_PAGES
 
 
+def lpf(old: float, new: float) -> float:
+    LPF_ALPHA = 0.90
+    if old == 0:
+        return new
+    return LPF_ALPHA * old + (1 - LPF_ALPHA) * new
+
+
 class TUI(App):
     CSS_PATH = "app.tcss"
 
@@ -38,10 +45,10 @@ class TUI(App):
     request_number: int = -1
     sequence_number: int = -1
     last_time: float = 0
-    dev_state: State = State.STATE_UNKNOWN
+    dev_status: Status = Status()
 
-    last_read_time: float = 0
-    last_write_time: float = 0
+    last_read_time: float = time.time()
+    last_write_time: float = time.time()
     last_read_interval: float = 0
     last_write_interval: float = 0
 
@@ -81,7 +88,9 @@ class TUI(App):
     def read(self):
         while True:
             t = time.time()
-            self.last_read_interval = t - self.last_read_time
+            self.last_read_interval = lpf(
+                self.last_read_interval, t - self.last_read_time
+            )
             self.last_read_time = t
 
             cobs_data = self.serial.read_until(b"\0")
@@ -96,16 +105,18 @@ class TUI(App):
             if status.state != State.STATE_IDLE and self.action != Action.ACTION_RESET:
                 self.action = Action.ACTION_NONE
 
-            self.dev_state = status.state
+            self.dev_status.CopyFrom(status)
 
-            if status.flash_status.state == flash.State.STATE_WRITING:
+            if status.flash_status.state == flash.State.STATE_PROGRAMMING:
                 self.request_number = status.flash_status.page_request
                 if self.request_number >= NUM_PAGES:
                     self.flashing_bytes = None
 
     def write(self):
         t = time.time()
-        self.last_write_interval = t - self.last_write_time
+        self.last_write_interval = lpf(
+            self.last_write_interval, t - self.last_write_time
+        )
         self.last_write_time = t
 
         command = Command(action=self.action)
@@ -113,7 +124,11 @@ class TUI(App):
 
         text = f"Seq Num: {self.sequence_number}"
 
-        if self.dev_state == State.STATE_FLASHING and self.flashing_bytes is not None:
+        if (
+            self.dev_status.state == State.STATE_FLASHING
+            and self.dev_status.flash_status.state == flash.State.STATE_PROGRAMMING
+            and self.flashing_bytes is not None
+        ):
             timeout = time.time() - self.last_time > 3
             if self.sequence_number < self.request_number or timeout:
                 self.sequence_number += 1
@@ -169,7 +184,6 @@ class TUI(App):
         data = data + b"\0" * (TOTAL_SIZE - size)
         self.flashing_bytes = data
         self.sequence_number = -1
-        self.sent_any = False
         self.request_number = -1
         self.action = Action.ACTION_FLASH
 
