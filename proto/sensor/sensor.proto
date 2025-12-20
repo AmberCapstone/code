@@ -6,8 +6,9 @@ import "flash.proto";
 
 enum Action {
     ACTION_NONE = 0;
-    ACTION_FLASH = 1;
-    ACTION_READOUT = 2;
+    ACTION_RESET = 1;
+    ACTION_FLASH = 2;
+    ACTION_READOUT = 3;
 }
 
 enum State {
@@ -22,8 +23,6 @@ message Command {
     flash.Page page = 2;
 
     uint32 page_request = 3; // only used in STATE_READOUT
-
-    uint32 tx_number = 5;
 }
 
 
@@ -40,13 +39,5 @@ message Status {
     // Only used in STATE_FLASHING
     flash.Status flash_status = 7;
 
-    uint32 last_msg_size = 11;
-    uint32 rx_buf_count = 12;
-    uint32 failed_crc = 14;
-    uint32 micros = 13;
-
-    Action last_action = 15;
-
-    uint32 received_bytes = 16;
-    uint32 decoded_bytes = 17;
+    uint32 micros = 8;
 }

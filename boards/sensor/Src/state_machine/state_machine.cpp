@@ -75,6 +75,12 @@ void HandleAction(sensor_action_t action) {
         case SENSOR_ACTION_NONE:
             break;
 
+        case SENSOR_ACTION_RESET:
+            if (state != SENSOR_STATE_IDLE) {
+                Transition(SENSOR_STATE_IDLE);
+            }
+            break;
+
         case SENSOR_ACTION_FLASH:
             if (state == SENSOR_STATE_IDLE) {
                 Transition(SENSOR_STATE_FLASHING);

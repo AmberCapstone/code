@@ -10,7 +10,6 @@
 #include "crc.h"
 #include "gpio.h"
 #include "spi.h"
-
 namespace flash {
 
 static uint32_t request_number = 0;
@@ -19,7 +18,6 @@ static sensor_flash_state_t state = SENSOR_FLASH_STATE_UNKNOWN;
 static SPI m25_spi(&hspi1, M25_nCHIP_SELECT_GPIO_Port, M25_nCHIP_SELECT_Pin);
 
 static uint32_t last_crc = 0;
-uint32_t failed_crc = 0;
 
 void Init(void) {
     state = SENSOR_FLASH_STATE_IDLE;
@@ -58,8 +56,6 @@ void ReceivePage(sensor_flash_page_t* page) {
 
     if (last_crc == page->crc) {
         request_number++;
-    } else {
-        failed_crc++;
     }
 
     if (request_number >= flash::NUM_PAGES) {

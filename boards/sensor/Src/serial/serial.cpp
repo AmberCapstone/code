@@ -29,20 +29,13 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 
 // RX State
 static uint32_t rx_counter = 0;
-static volatile uint16_t rx_buf_count = 0;
-static uint8_t rx_buffer[1024];
-static uint8_t decoded_buffer[1024];
-static amber::cobs::Decoder rx_decoder(decoded_buffer);
 
-static uint32_t last_size = 0;
-extern uint32_t failed_crc = 0;
-static uint32_t last_msg_size = 0;
+constexpr uint32_t RX_BUF_SIZE = 1024;
+static uint8_t rx_buffer[RX_BUF_SIZE];
+static uint16_t rx_buf_start = 0;
+static volatile uint16_t rx_buf_end = 0;
 
-uint32_t received_bytes = 0;
-uint32_t decoded_bytes = 0;
-
-static uint16_t last_micros = 0;
-static uint16_t last_wake = 0;
+static amber::cobs::Decoder<1024> rx_decoder;
 
 // TX State
 static uint8_t tx_counter = 0;
@@ -50,44 +43,51 @@ static uint8_t pb_buffer[SENSOR_STATUS_SIZE];
 static uint8_t cobs_buffer[amber::cobs::MaxEncodedLength(SENSOR_STATUS_SIZE)];
 
 static sensor_command_t last_command;
+static uint16_t last_micros = 0;
 
 static void HandleCommand(sensor_command_t* cmd);
+static void SendStatus(void);
 
 void Init(void) {
     // Wait for USB initialization to complete
     while (((volatile USBD_HandleTypeDef*)hUsbDeviceFS.pClassData) == NULL);
 
-    HAL_TIM_Base_Start(&htim7);
+    HAL_TIM_Base_Start(&htim7);  // micros timer for benchmarking
+}
+
+void Update_10hz(void) {
+    if (state_machine::GetState() != SENSOR_STATE_FLASHING) {
+        SendStatus();
+    }
+}
+
+void Update_100hz(void) {
+    // Respond faster while flashing to speed up acknowledgements
+    if (state_machine::GetState() == SENSOR_STATE_FLASHING) {
+        SendStatus();
+    }
 }
 
 void Receive(void) {
-    uint16_t micros = __HAL_TIM_GET_COUNTER(&htim7);
-    last_micros = __HAL_TIM_GET_COUNTER(&htim7) - last_wake;
-    last_wake = micros;
+    bool has_data = false;
 
-    __disable_irq();
-    if (rx_buf_count == 0) {
-        // No data, nothing to do.
-        __enable_irq();
-        return;
+    uint16_t micros = __HAL_TIM_GET_COUNTER(&htim7);
+    while (rx_buf_start != rx_buf_end && !has_data) {
+        has_data = rx_decoder.Decode(&rx_buffer[rx_buf_start], 1);
+        rx_buf_start = (rx_buf_start + 1) % RX_BUF_SIZE;
     }
 
-    last_size = rx_buf_count;
-    if (rx_decoder.Decode(rx_buffer, rx_buf_count)) {
-        last_msg_size = rx_decoder.length;
+    if (has_data) {
         pb_istream_s istream =
             pb_istream_from_buffer(rx_decoder.buffer, rx_decoder.length);
         sensor_command_t cmd;
-        // 77 us for short msg, 200 us for 256 bytes,
         if (pb_decode(&istream, &sensor_command_t_msg, &cmd)) {
             HandleCommand(&cmd);
         }
         rx_decoder.Reset();
     }
-    rx_buf_count = 0;
-    __disable_irq();
-
-}  // 320 us with data, 75 without
+    last_micros = __HAL_TIM_GET_COUNTER(&htim7) - micros;
+}
 
 void SendStatus(void) {
     sensor_status_t status{
@@ -95,20 +95,8 @@ void SendStatus(void) {
         .tx_counter = tx_counter++,
         .has_rx_counter = true,
         .rx_counter = rx_counter,
-        .has_last_msg_size = true,
-        .last_msg_size = last_msg_size,
-        .has_rx_buf_count = true,
-        .rx_buf_count = last_size - last_msg_size,
         .has_micros = true,
         .micros = last_micros,
-        .has_failed_crc = true,
-        .failed_crc = failed_crc,
-        .has_last_action = last_command.has_action,
-        .last_action = last_command.action,
-        .has_received_bytes = true,
-        .received_bytes = received_bytes,
-        .has_decoded_bytes = true,
-        .decoded_bytes = decoded_bytes,
     };
 
     sensors::PopulateStatus(&status);
@@ -125,7 +113,7 @@ void SendStatus(void) {
             amber::cobs::Encode(pb_buffer, ostream.bytes_written, cobs_buffer);
         CDC_Transmit(cobs_buffer, len);
     }
-}  // 300 us
+}
 
 void HandleCommand(sensor_command_t* cmd) {
     rx_counter++;
@@ -135,8 +123,6 @@ void HandleCommand(sensor_command_t* cmd) {
 
     if (cmd->has_page) {
         flash::ReceivePage(&cmd->page);  // 33 us
-
-        HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
     }
 
     last_command = *cmd;
@@ -144,9 +130,10 @@ void HandleCommand(sensor_command_t* cmd) {
 
 // Modifiers
 void SerialReceiveBytes(uint8_t* bytes, uint32_t len) {
-    memcpy(rx_buffer + rx_buf_count, bytes, len);
-    rx_buf_count += len;
-    received_bytes += len;
+    for (uint32_t i = 0; i < len; i++) {
+        rx_buffer[rx_buf_end] = bytes[i];
+        rx_buf_end = (rx_buf_end + 1) % RX_BUF_SIZE;
+    }
 }
 
 }  // namespace serial

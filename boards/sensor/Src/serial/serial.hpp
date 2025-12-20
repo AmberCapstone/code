@@ -7,7 +7,9 @@ namespace serial {
 // Behaviour
 void Init(void);
 void Receive(void);
-void SendStatus(void);
+
+void Update_10hz(void);
+void Update_100hz(void);
 
 // Modifiers
 extern "C" {

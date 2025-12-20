@@ -2,6 +2,7 @@ import binascii
 import subprocess
 import time
 from pathlib import Path
+import threading
 
 import cobs
 import serial
@@ -32,11 +33,9 @@ class TUI(App):
     d_status = reactive(dict())
 
     action: Action = Action.ACTION_NONE
-    tx_number: int = 0
 
     flashing_bytes: bytes | None = None
     request_number: int = -1
-    sent_any: bool = False
     sequence_number: int = -1
     last_time: float = 0
     dev_state: State = State.STATE_UNKNOWN
@@ -50,25 +49,29 @@ class TUI(App):
         amber_ports = [
             p
             for p in serial.tools.list_ports.comports()
-            if p.manufacturer == "amber" and p.product == "SPI Flash"
+            if p.manufacturer == "amber" and p.product == "Sensor Board"
         ]
 
         if len(amber_ports) != 1:
-            print(f"Expected 1 amber SPI Flash USB device, found {len(amber_ports)}")
-            exit(1)
+            self.exit(
+                1,
+                message=f"Expected 1 amber SPI Flash USB device, found {len(amber_ports)}",
+            )
 
         self.serial = serial.Serial(amber_ports[0].device)
 
-        self.set_interval(0.01, self.read)
+        self.rt = threading.Thread(target=self.read)
+        self.rt.start()
         self.set_interval(0.01, self.write)
 
     def compose(self) -> ComposeResult:
         with Horizontal():
             with Vertical(classes="box"):
-                yield Label("...", id="flash-file")
                 with Horizontal():
                     yield Button("Flash", id="btn-flash")
                     yield Button("Readout", id="btn-readout")
+                    yield Button("Reset", id="btn-reset")
+                yield Label("...", id="flash-file")
                 yield Label("Command")
                 yield Pretty("command", id="lab-cmd")
             with Vertical(classes="box"):
@@ -76,38 +79,40 @@ class TUI(App):
                 yield Pretty("status", id="lab-sts")
 
     def read(self):
-        t = time.time()
-        self.last_read_interval = t - self.last_read_time
-        self.last_read_time = t
+        while True:
+            t = time.time()
+            self.last_read_interval = t - self.last_read_time
+            self.last_read_time = t
 
-        cobs_data = self.serial.read_until(b"\0")
-        decoder = cobs.Decoder()
-        decoder.Decode(cobs_data)
-        cobs.Decoder().Decode(cobs_data)
+            cobs_data = self.serial.read_until(b"\0")
+            decoder = cobs.Decoder()
+            decoder.Decode(cobs_data)
+            cobs.Decoder().Decode(cobs_data)
 
-        status = Status()
-        status.ParseFromString(decoder.output)
-        self.d_status = json_format.MessageToDict(status)
+            status = Status()
+            status.ParseFromString(decoder.output)
+            self.d_status = json_format.MessageToDict(status)
 
-        if status.state != State.STATE_IDLE:
-            self.action = Action.ACTION_NONE
+            if status.state != State.STATE_IDLE and self.action != Action.ACTION_RESET:
+                self.action = Action.ACTION_NONE
 
-        self.dev_state = status.state
+            self.dev_state = status.state
 
-        if status.flash_status.state == flash.State.STATE_WRITING:
-            self.request_number = status.flash_status.page_request
-            if self.request_number >= NUM_PAGES:
-                self.flashing_bytes = None
+            if status.flash_status.state == flash.State.STATE_WRITING:
+                self.request_number = status.flash_status.page_request
+                if self.request_number >= NUM_PAGES:
+                    self.flashing_bytes = None
 
     def write(self):
         t = time.time()
         self.last_write_interval = t - self.last_write_time
         self.last_write_time = t
 
-        command = Command(action=self.action, tx_number=self.tx_number)
+        command = Command(action=self.action)
         label = self.query_exactly_one("#flash-file", Label)
 
         text = f"Seq Num: {self.sequence_number}"
+
         if self.dev_state == State.STATE_FLASHING and self.flashing_bytes is not None:
             timeout = time.time() - self.last_time > 3
             if self.sequence_number < self.request_number or timeout:
@@ -123,18 +128,20 @@ class TUI(App):
                 command.page.CopyFrom(
                     flash.Page(page_number=self.sequence_number, data=data, crc=crc)
                 )
-                self.sent_any = True
                 self.last_time = time.time()
 
-        label.update(text + f"{self.sent_any}")
+                self.send(command)
+        else:
+            self.send(command)
 
+        text += f"\n READ  {self.last_read_interval*1000:8.2f} ms"
+        text += f"\n WRITE {self.last_write_interval*1000:8.2f} ms"
+        label.update(text)
+
+    def send(self, command: Command) -> None:
         b = cobs.Encode(command.SerializeToString())
         self.serial.write(b)
-
         self.d_command = json_format.MessageToDict(command)
-        # self.d_command["data"] = " ".join(f"{b:02x}" for b in self.command.page.data)
-        self.d_command["read_ms"] = f"{self.last_read_interval*1000:.2f} ms"
-        self.d_command["write_ms"] = f"{self.last_write_interval*1000:.2f} ms"
 
     def watch_d_command(self, value: dict) -> None:
         self.query_exactly_one("#lab-cmd", Pretty).update(value)
@@ -170,6 +177,11 @@ class TUI(App):
     @work
     async def readout(self, event: Button.Pressed) -> None:
         self.action = Action.ACTION_READOUT
+
+    @on(Button.Pressed, "#btn-reset")
+    @work
+    async def reset(self, event: Button.Pressed) -> None:
+        self.action = Action.ACTION_RESET
 
 
 if __name__ == "__main__":
