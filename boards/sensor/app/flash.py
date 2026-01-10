@@ -1,13 +1,13 @@
 import binascii
 import subprocess
+import sys
+import threading
 import time
 
-from tqdm import tqdm
 import cobs
 import serial
 import serial.tools.list_ports
-import threading
-import sys
+from tqdm import tqdm
 
 if subprocess.call(["sh", "generate_proto.sh"]) != 0:
     exit(1)
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     while status.flash_status.state == flash.State.STATE_ERASING:
         time.sleep(0.1)
 
-    pbar = tqdm(total=TOTAL_SIZE, unit="byte", desc="Programming")
+    pbar = tqdm(total=TOTAL_SIZE, unit="byte", desc="Programming", ascii=" >=")
 
     last_tx_time = time.time()
     sequence_number = -1
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     pbar.refresh()
     pbar.close()
 
-    pbar = tqdm(total=NUM_PAGES, unit="page", desc="Verifying")
+    pbar = tqdm(total=NUM_PAGES, unit="page", desc="Verifying", ascii=" >=")
 
     request_number = 0
     errors = []
@@ -190,11 +190,7 @@ if __name__ == "__main__":
 
     print(f"{len(errors)} error(s)")
     for e in errors:
-        print(
-            f"0x{e['page']:03X} "
-            f"| {e['expected_crc']:08x} "
-            f"| {e['actual_crc']:08x}"
-        )
+        print(f"0x{e['page']:03X} | {e['expected_crc']:08x} | {e['actual_crc']:08x}")
 
     stop_signal.set()
     rt.join()
