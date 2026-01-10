@@ -1,0 +1,2 @@
+PlatformIO does not natively support the STM32U0 series.
+This file adds support.
