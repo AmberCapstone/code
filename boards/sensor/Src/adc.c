@@ -51,14 +51,14 @@ void MX_ADC1_Init(void) {
     hadc1.Init.LowPowerAutoWait = DISABLE;
     hadc1.Init.LowPowerAutoPowerOff = DISABLE;
     hadc1.Init.ContinuousConvMode = DISABLE;
-    hadc1.Init.NbrOfConversion = 3;
+    hadc1.Init.NbrOfConversion = 4;
     hadc1.Init.DiscontinuousConvMode = DISABLE;
     hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIG_T6_TRGO;
     hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
     hadc1.Init.DMAContinuousRequests = ENABLE;
     hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
-    hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_12CYCLES_5;
-    hadc1.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_1CYCLE_5;
+    hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_160CYCLES_5;
+    hadc1.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_160CYCLES_5;
     hadc1.Init.OversamplingMode = DISABLE;
     hadc1.Init.TriggerFrequencyMode = ADC_TRIGGER_FREQ_LOW;
     if (HAL_ADC_Init(&hadc1) != HAL_OK) {
@@ -89,12 +89,21 @@ void MX_ADC1_Init(void) {
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
         Error_Handler();
     }
+
+    /** Configure Regular Channel
+     */
+    sConfig.Channel = ADC_CHANNEL_8;
+    sConfig.Rank = ADC_REGULAR_RANK_4;
+    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+        Error_Handler();
+    }
     /* USER CODE BEGIN ADC1_Init 2 */
 
     /* USER CODE END ADC1_Init 2 */
 }
 
 void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle) {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
     HAL_DMA_MuxSyncConfigTypeDef pSyncConfig = {0};
     RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
     if (adcHandle->Instance == ADC1) {
@@ -112,6 +121,15 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle) {
 
         /* ADC1 clock enable */
         __HAL_RCC_ADC_CLK_ENABLE();
+
+        __HAL_RCC_GPIOA_CLK_ENABLE();
+        /**ADC1 GPIO Configuration
+        PA4     ------> ADC1_IN8
+        */
+        GPIO_InitStruct.Pin = SUPERCAP_Pin;
+        GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        HAL_GPIO_Init(SUPERCAP_GPIO_Port, &GPIO_InitStruct);
 
         /* ADC1 DMA Init */
         /* ADC1 Init */
@@ -152,6 +170,11 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle) {
         /* USER CODE END ADC1_MspDeInit 0 */
         /* Peripheral clock disable */
         __HAL_RCC_ADC_CLK_DISABLE();
+
+        /**ADC1 GPIO Configuration
+        PA4     ------> ADC1_IN8
+        */
+        HAL_GPIO_DeInit(SUPERCAP_GPIO_Port, SUPERCAP_Pin);
 
         /* ADC1 DMA DeInit */
         HAL_DMA_DeInit(adcHandle->DMA_Handle);

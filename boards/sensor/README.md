@@ -13,7 +13,7 @@ Open `spi-flash.ioc` in CubeMX and click "Generate Code" to generate the `Driver
 Break out a USB wire and connect to a Nucleo-U083RC
 
 | USB  | STM32 |
-|:-----|:------|
+| :--- | :---- |
 | D-   | PA11  |
 | D+   | PA12  |
 | GND  | GND   |
@@ -21,16 +21,23 @@ Break out a USB wire and connect to a Nucleo-U083RC
 
 Connect the M25PE SPI flash to the Nucleo.
 
-|  SPI   | STM32 | Description  |
-|:-------|:------|:-------------|
-| 1 nS   | PB6   | Chip Select  |
-| 2 Q    | PA6   | MISO         |
-| 3 nW   | PC7   | Write Protect|
-| 4 VSS  | GND   | Ground       |
-| 5 D    | PA7   | MOSI         |
-| 6 C    | PB3   | SCK          |
-| 7 nRST | PA9   | Reset        |
-| 8 VCC  | 3.3V  | Supply Volt  |
+| SPI    | STM32 | Description   |
+| :----- | :---- | :------------ |
+| 1 nS   | PB6   | Chip Select   |
+| 2 Q    | PA6   | MISO          |
+| 3 nW   | PC7   | Write Protect |
+| 4 VSS  | GND   | Ground        |
+| 5 D    | PA7   | MOSI          |
+| 6 C    | PB3   | SCK           |
+| 7 nRST | PA9   | Reset         |
+| 8 VCC  | 3.3V  | Supply Volt   |
+
+Connect the energy harvester circuit.
+
+| Harvester | STM32 | Description                        |
+| :-------- | :---- | :--------------------------------- |
+| GND       | GND   | Ground                             |
+| VBAT      | PA4   | Battery ADC (via 2x 1MOhm divider) |
 
 Flash the code to the Nucleo `pio run -t upload`.
 

@@ -40,4 +40,8 @@ message Status {
     flash.Status flash_status = 7;
 
     uint32 micros = 8;
+
+    // sensors
+    uint32 supercap_mv = 10;
+    uint32 iload_ma = 11;
 }

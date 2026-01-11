@@ -15,6 +15,7 @@ void Update_10hz(void);
 int32_t GetTemperatureC(void);
 int32_t GetVrefintMv(void);
 int32_t GetVbatMv(void);
+int32_t GetSupercapMv(void);
 void PopulateStatus(sensor_status_t* msg);
 
 }  // namespace sensors
