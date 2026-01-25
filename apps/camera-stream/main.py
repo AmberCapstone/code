@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import serial
 
-PORT = "/dev/ttyUSB0"
+PORT = "COM3"
 BAUD = 2_000_000
 
 

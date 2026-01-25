@@ -62,19 +62,19 @@ int main(void) {
     _delay_ms(2);
 
     constexpr setting_t settings[] = {
-        {ov7670::reg::CLKRC, 0x9f},  // input clock prescaler = 2
-        {ov7670::reg::TSLB, 0x00},   // output sequence YUYV
+        // {ov7670::reg::CLKRC, 0x9f},  // input clock prescaler = 2
+        // {ov7670::reg::TSLB, 0x00},   // output sequence YUYV
 
-        // VGA Settings (from Table 2-2)
-        {ov7670::reg::COM7, 0x00},   // VGA, YUV output (this is default)
-        {ov7670::reg::COM3, 0x00},   // No scale, no tristate (this is default)
-        {ov7670::reg::COM14, 0x00},  // No manual scaling, PCLK divider = 1
-        {ov7670::reg::COM10, 0x20},
-        {ov7670::reg::SCALING_XSC, 0x3A},
-        {ov7670::reg::SCALING_YSC, 0x35},
-        {ov7670::reg::SCALING_DCWCTR, 0x11},
-        {ov7670::reg::SCALING_PCLK_DIV, 0xF0},
-        {ov7670::reg::SCALING_PCLK_DELAY, 0x02},
+        // // VGA Settings (from Table 2-2)
+        // {ov7670::reg::COM7, 0x00},   // VGA, YUV output (this is default)
+        // {ov7670::reg::COM3, 0x00},   // No scale, no tristate (this is default)
+        // {ov7670::reg::COM14, 0x00},  // No manual scaling, PCLK divider = 1
+        // {ov7670::reg::COM10, 0x20},
+        {ov7670::reg::SCALING_XSC, 0x3F},
+        {ov7670::reg::SCALING_YSC, 0x3F},
+        // {ov7670::reg::SCALING_DCWCTR, 0x11},
+        // {ov7670::reg::SCALING_PCLK_DIV, 0xF0},
+        // {ov7670::reg::SCALING_PCLK_DELAY, 0x02},
     };
     constexpr uint8_t LEN_SETTINGS = sizeof(settings) / sizeof(settings[0]);
 
