@@ -7,10 +7,10 @@ PORT = "COM3"
 BAUD = 2_000_000
 
 def main():
-    arduino = serial.Serial(PORT, baudrate=BAUD, timeout=5)
+    arduino = serial.Serial(PORT, baudrate=BAUD, timeout=0.1)
     dec = Decoder()
 
-    print(f"Listening on {PORT} @ {BAUD} baud (COBS)...")\
+    print(f"Listening on {PORT} @ {BAUD} baud (COBS)...")
     
     try:
         while True:
