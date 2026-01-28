@@ -1,0 +1,13 @@
+[project]
+name = "spi-stream"
+version = "0.1.0"
+description = "Read COBS SPI reply packets from Arduino and print"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "cobs",
+    "pyserial>=3.5",
+]
+
+[tool.uv.sources]
+cobs = { path = "../../lib/python/cobs", editable = true }
