@@ -1,7 +1,7 @@
 #include <util/delay.h>
 #include <stdint.h>
 
-#include "spi/spi.hpp"
+#include "spi.hpp"
 
 using namespace amber;
 
