@@ -1,6 +1,8 @@
 #pragma once
 #include <stdint.h>
 
+#define MAX_PACKET_LEN 643
+
 namespace amber::spi {
 
     enum class Mode : uint8_t {
@@ -26,6 +28,6 @@ namespace amber::spi {
     void CSDeassert();
 
     // simultaneous transfer and read
-    void PacketTransfer8(const uint8_t tx[8], uint8_t rx[8]);
+    void PacketTransfer(const uint8_t tx[MAX_PACKET_LEN], uint8_t rx[MAX_PACKET_LEN], const uint16_t len);
 
 } // namespace amber::spi

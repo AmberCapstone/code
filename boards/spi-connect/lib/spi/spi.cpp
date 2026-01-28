@@ -3,6 +3,8 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
+#define MAX_PACKET_LEN 643
+
 namespace amber::spi{
 
     static inline void cs_low() { PORTB &= ~_BV(PB2); }
@@ -83,9 +85,9 @@ namespace amber::spi{
         cs_high();
     }
 
-    void PacketTransfer8(const uint8_t tx[8], uint8_t rx[8]) {
+    void PacketTransfer(const uint8_t tx[MAX_PACKET_LEN], uint8_t rx[MAX_PACKET_LEN], const uint16_t len) {
         CSAssert();
-        for (uint8_t i = 0; i < 8; i++) {
+        for (uint16_t i = 0; i < len; i++) {
             rx[i] = Transfer(tx[i]);
         }
         CSDeassert();

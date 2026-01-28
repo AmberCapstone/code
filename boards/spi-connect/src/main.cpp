@@ -17,7 +17,7 @@ static constexpr uint8_t OPC_LEDS = 0x04;
 
 static void transfer(const uint8_t tx[8], uint8_t rx[8]) {
     while (serial::IsBusy()) { }
-    spi::PacketTransfer8(tx, rx);
+    spi::PacketTransfer(tx, rx, 8);
     serial::Transmit(rx, 8);
     _delay_ms(1000);
 }
@@ -27,7 +27,7 @@ static void tx_inv32(const uint8_t data[4]) {
     uint8_t tx[8] = {OPC_INV32, 0, 0, 0, 0, 0, 0, 0}; 
     uint8_t rx[8];
     for (uint8_t i = 0; i < 4; i++) tx[i+1] = data[i];
-    spi::PacketTransfer8(tx, rx);
+    spi::PacketTransfer(tx, rx, 8);
     serial::Transmit(rx, 8);
     _delay_ms(1000);
 }
