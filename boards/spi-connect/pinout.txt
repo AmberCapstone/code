@@ -9,7 +9,7 @@ Arduino Name | Arduino PIN | FPGA Name | FPGA PIN
  Notes
 -------
 SCK, MOSI, and SS_n (D13, D11, D10) are 5V outputs from the Arduino
-and need to be stepped down to 3.3 with a 4.7k + 10k resistor divider.
+and need to be stepped down to 3.3 with a 5.1k + 10k resistor divider.
 
 MISO is a 3.3V output from the FPGA and needs to be stepped 
 up with a 3.3 to 5V converter, such as TXS0108E

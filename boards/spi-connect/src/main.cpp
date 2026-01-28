@@ -54,6 +54,18 @@ int main(void) {
         spi::PacketTransfer8(tx, rx);
         _delay_ms(300);
 
+        tx[1] = 0x03;
+        spi::PacketTransfer8(tx, rx);
+        _delay_ms(300);
+
+        tx[1] = 0x05;
+        spi::PacketTransfer8(tx, rx);
+        _delay_ms(300);
+
+        tx[1] = 0x07;
+        spi::PacketTransfer8(tx, rx);
+        _delay_ms(300);
+
         // Off
         tx[1] = 0x00;
         spi::PacketTransfer8(tx, rx);
