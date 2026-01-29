@@ -3,7 +3,8 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
-#define MAX_PACKET_LEN 643
+#define ROW_LEN 176 // 176 for QCIF, 352 for CIF, 320 for QVGA, 640 for VGA
+#define MAX_PACKET_LEN (ROW_LEN+3) // row length + 1 byte opcode + 2 byte address (row number)
 
 namespace amber::spi{
 
