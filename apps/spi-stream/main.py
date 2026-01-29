@@ -86,7 +86,7 @@ def main():
 
             # Try to extract bytes 1..4 as the returned/inverted data
             if len(got) >= 5:
-                got_data = got[1:5]
+                got_data = got[4:8]
                 ok = (got_data == expect)
                 print("  got:", got_data.hex(" "), " expected:", expect.hex(" "), " OK" if ok else " FAIL")
             else:
