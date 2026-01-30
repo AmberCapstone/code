@@ -28,6 +28,7 @@ def read_frame(ser: serial.Serial, timeout_s: float = 1) -> bytes | None:
     return None
 
 def send_frame(ser: serial.Serial, payload: bytes) -> None:
+    print("payload:", payload)
     encoded = bytes(Encode(payload))
     ser.write(encoded)
 
@@ -46,6 +47,8 @@ def main():
     with serial.Serial(PORT, baudrate=BAUD, timeout=0.1) as ser:
         print(f"Connected to {PORT} @ {BAUD} baud")
 
+        time.sleep(2.0)
+
         ser.reset_input_buffer()
         ser.reset_output_buffer()
 
@@ -53,7 +56,7 @@ def main():
         resp = read_frame(ser, timeout_s=1.0)
         print("INIT resp:", resp.hex(" ") if resp else "<timeout>")
 
-        time.sleep(0.2)
+        time.sleep(0.5)
 
         # LED cycle
         for val in [0x01, 0x02, 0x04, 0x03, 0x05, 0x07, 0x00]:
