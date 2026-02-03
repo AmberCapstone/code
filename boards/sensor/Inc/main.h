@@ -57,16 +57,58 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define SUPERCAP_Pin GPIO_PIN_4
-#define SUPERCAP_GPIO_Port GPIOA
-#define LD4_Pin GPIO_PIN_5
-#define LD4_GPIO_Port GPIOA
-#define M25_nWRITE_PROTECT_Pin GPIO_PIN_7
-#define M25_nWRITE_PROTECT_GPIO_Port GPIOC
-#define M25_nRESET_Pin GPIO_PIN_9
-#define M25_nRESET_GPIO_Port GPIOA
-#define M25_nCHIP_SELECT_Pin GPIO_PIN_6
-#define M25_nCHIP_SELECT_GPIO_Port GPIOB
+#define CAM_PWRDN_Pin GPIO_PIN_13
+#define CAM_PWRDN_GPIO_Port GPIOC
+#define CAM_RESETn_Pin GPIO_PIN_3
+#define CAM_RESETn_GPIO_Port GPIOC
+#define ISENSE_Pin GPIO_PIN_0
+#define ISENSE_GPIO_Port GPIOA
+#define FPGA_ISENSE_Pin GPIO_PIN_1
+#define FPGA_ISENSE_GPIO_Port GPIOA
+#define VSENSE_Pin GPIO_PIN_4
+#define VSENSE_GPIO_Port GPIOA
+#define DEBUG_LED_Pin GPIO_PIN_5
+#define DEBUG_LED_GPIO_Port GPIOA
+#define CAM_PWR_EN_Pin GPIO_PIN_6
+#define CAM_PWR_EN_GPIO_Port GPIOA
+#define FPGA_PWR_EN_Pin GPIO_PIN_7
+#define FPGA_PWR_EN_GPIO_Port GPIOA
+#define FPGA_GPIO2_Pin GPIO_PIN_5
+#define FPGA_GPIO2_GPIO_Port GPIOC
+#define FPGA_GPIO1_Pin GPIO_PIN_0
+#define FPGA_GPIO1_GPIO_Port GPIOB
+#define FPGA_PWRDN_Pin GPIO_PIN_1
+#define FPGA_PWRDN_GPIO_Port GPIOB
+#define FPGA_DRDY_Pin GPIO_PIN_2
+#define FPGA_DRDY_GPIO_Port GPIOB
+#define FPGA_CDONE_Pin GPIO_PIN_10
+#define FPGA_CDONE_GPIO_Port GPIOB
+#define FPGA_CRESETn_Pin GPIO_PIN_11
+#define FPGA_CRESETn_GPIO_Port GPIOB
+#define FPGA_CSn_Pin GPIO_PIN_12
+#define FPGA_CSn_GPIO_Port GPIOB
+#define FPGA_SCK_Pin GPIO_PIN_13
+#define FPGA_SCK_GPIO_Port GPIOB
+#define FPGA_MISO_Pin GPIO_PIN_14
+#define FPGA_MISO_GPIO_Port GPIOB
+#define FPGA_MOSI_Pin GPIO_PIN_15
+#define FPGA_MOSI_GPIO_Port GPIOB
+#define VBAT_OK_Pin GPIO_PIN_9
+#define VBAT_OK_GPIO_Port GPIOA
+#define USB_PWR_ON_Pin GPIO_PIN_10
+#define USB_PWR_ON_GPIO_Port GPIOA
+#define FLASH_SCK_Pin GPIO_PIN_10
+#define FLASH_SCK_GPIO_Port GPIOC
+#define FLASH_MISO_Pin GPIO_PIN_11
+#define FLASH_MISO_GPIO_Port GPIOC
+#define FLASH_MOSI_Pin GPIO_PIN_12
+#define FLASH_MOSI_GPIO_Port GPIOC
+#define FLASH_CSn_Pin GPIO_PIN_4
+#define FLASH_CSn_GPIO_Port GPIOB
+#define FLASH_RESETn_Pin GPIO_PIN_5
+#define FLASH_RESETn_GPIO_Port GPIOB
+#define GPIO1_Pin GPIO_PIN_8
+#define GPIO1_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

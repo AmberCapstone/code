@@ -25,4 +25,9 @@ message Status {
     // readout
     sint32 sequence_number = 4;
     fixed32 readout_crc = 5;
+
+    Page readout_page = 7; // temp
+
+    // debug
+    fixed32 id = 6;
 }

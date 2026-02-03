@@ -178,6 +178,7 @@ if __name__ == "__main__":
                         "page": sn,
                         "expected_crc": expected_crcs[sn],
                         "actual_crc": status.flash_status.readout_crc,
+                        "data": status.flash_status.readout_page,
                     }
                 )
 
@@ -186,11 +187,26 @@ if __name__ == "__main__":
     pbar.refresh()
     pbar.close()
 
-    print("Done!")
-
     print(f"{len(errors)} error(s)")
-    for e in errors:
-        print(f"0x{e['page']:03X} | {e['expected_crc']:08x} | {e['actual_crc']:08x}")
+    if len(errors) != 0:
+        print("Page  | Exp. CRC | Act. CRC")
+        for e in errors:
+            print(
+                f"0x{e['page']:03X} | {e['expected_crc']:08x} | {e['actual_crc']:08x}"
+            )
+            d: flash.Page = e["data"]
+            print(f"pagenum: {d.page_number}")
+            for i in range(256):
+                if d.data[i] == i:
+                    print(f" {d.data[i]:02x} ", end="")
+                else:
+                    print(f"[{d.data[i]:02x}]", end="")
+                if i % 16 == 15:
+                    print("")
+            print(f"crc = {d.crc} = 0x{d.crc:08x}")
+            print("------------")
+
+    print("Done!")
 
     stop_signal.set()
     rt.join()

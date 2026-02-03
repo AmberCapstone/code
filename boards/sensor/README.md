@@ -21,16 +21,16 @@ Break out a USB wire and connect to a Nucleo-U083RC
 
 Connect the M25PE SPI flash to the Nucleo.
 
-| SPI    | STM32 | Description   |
-| :----- | :---- | :------------ |
-| 1 nS   | PB6   | Chip Select   |
-| 2 Q    | PA6   | MISO          |
-| 3 nW   | PC7   | Write Protect |
-| 4 VSS  | GND   | Ground        |
-| 5 D    | PA7   | MOSI          |
-| 6 C    | PB3   | SCK           |
-| 7 nRST | PA9   | Reset         |
-| 8 VCC  | 3.3V  | Supply Volt   |
+| SPI    | STM32   | Description   |
+| :----- | :------ | :------------ |
+| 1 nS   | PB4 PU  | Chip Select   |
+| 2 Q    | PC11    | MISO          |
+| 3 nW   | 3.3V PU | Write Protect |
+| 4 VSS  | GND     | Ground        |
+| 5 D    | PC12    | MOSI          |
+| 6 C    | PC10    | SCK           |
+| 7 nRST | PB5 PU  | Reset         |
+| 8 VCC  | 3.3V    | Supply Volt   |
 
 Connect the energy harvester circuit.
 

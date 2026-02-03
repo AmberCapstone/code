@@ -25,13 +25,16 @@ static int32_t sequence_number = 0;
 static int32_t readout_req_number = 0;
 static uint32_t readout_crc = 0;
 
-static SPI m25_spi(&hspi1, M25_nCHIP_SELECT_GPIO_Port, M25_nCHIP_SELECT_Pin);
+static uint32_t id = 0;
+
+static SPI m25_spi(&hspi3, FLASH_CSn_GPIO_Port, FLASH_CSn_Pin);
 
 static uint32_t last_crc = 0;
 
 static bool writing = false;
 
 static sensor_flash_page_t next_page = SENSOR_FLASH_PAGE_INIT_ZERO;
+static sensor_flash_page_t readout_page = SENSOR_FLASH_PAGE_INIT_ZERO;
 
 uint8_t page_buf[256] = {0};
 
@@ -42,11 +45,10 @@ static void Transition(sensor_flash_state_t new_state) {
 void Init(void) {
     Transition(SENSOR_FLASH_STATE_IDLE);
 
-    HAL_GPIO_WritePin(M25_nWRITE_PROTECT_GPIO_Port, M25_nWRITE_PROTECT_Pin,
-                      GPIO_PIN_SET);
-    HAL_GPIO_WritePin(M25_nRESET_GPIO_Port, M25_nRESET_Pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(M25_nCHIP_SELECT_GPIO_Port, M25_nCHIP_SELECT_Pin,
-                      GPIO_PIN_SET);
+    HAL_GPIO_WritePin(FLASH_RESETn_GPIO_Port, FLASH_RESETn_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(FLASH_CSn_GPIO_Port, FLASH_CSn_Pin, GPIO_PIN_SET);
+
+    id = amber::m25pe::ReadIdentification(m25_spi);
 }
 
 void Start(void) {
@@ -146,12 +148,19 @@ void Update_1khz(void) {
                 sequence_number++;
                 amber::m25pe::ReadData(m25_spi, sequence_number * PAGE_SIZE,
                                        PAGE_SIZE, page_buf);
+                readout_page.has_data = true;
+                memcpy(readout_page.data, page_buf, PAGE_SIZE);
 
+                readout_page.has_page_number = true;
                 uint32_t pagenum_u32 = static_cast<uint32_t>(sequence_number);
+                readout_page.page_number = pagenum_u32;
+
                 HAL_CRC_Calculate(&hcrc, &pagenum_u32, 4);
                 readout_crc =
                     HAL_CRC_Accumulate(&hcrc, (uint32_t*)page_buf, PAGE_SIZE) ^
                     0xffffffff;
+                readout_page.has_crc = true;
+                readout_page.crc = readout_crc;
             }
 
             if (readout_req_number == NUM_PAGES) {
@@ -179,6 +188,8 @@ bool IsDone(void) {
 void PopulateStatus(sensor_flash_status_t* msg) {
     msg->has_state = true;
     msg->state = state;
+    msg->has_id = true;
+    msg->id = id;
 
     switch (state) {
         case SENSOR_FLASH_STATE_PROGRAMMING:
@@ -195,6 +206,9 @@ void PopulateStatus(sensor_flash_status_t* msg) {
 
             msg->has_readout_crc = true;
             msg->readout_crc = readout_crc;
+
+            msg->has_readout_page = true;
+            msg->readout_page = readout_page;
             break;
 
         default:

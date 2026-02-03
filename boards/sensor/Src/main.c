@@ -24,8 +24,10 @@
 #include "crc.h"
 #include "dma.h"
 #include "gpio.h"
+#include "i2c.h"
 #include "spi.h"
 #include "tim.h"
+#include "usart.h"
 #include "usb.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -97,11 +99,15 @@ int main(void) {
     MX_GPIO_Init();
     MX_DMA_Init();
     MX_USB_PCD_Init();
-    MX_SPI1_Init();
     MX_ADC1_Init();
     MX_TIM6_Init();
     MX_CRC_Init();
     MX_TIM7_Init();
+    MX_SPI2_Init();
+    MX_SPI3_Init();
+    MX_I2C3_Init();
+    MX_USART2_UART_Init();
+    MX_I2C1_Init();
     /* USER CODE BEGIN 2 */
 
     /* USER CODE END 2 */
@@ -179,6 +185,8 @@ void SystemClock_Config(void) {
     RCC_CRSInitStruct.HSI48CalibrationValue = 32;
 
     HAL_RCCEx_CRSConfig(&RCC_CRSInitStruct);
+    HAL_RCC_MCOConfig(RCC_MCO1, RCC_MCO1SOURCE_SYSCLK, RCC_MCO1DIV_1);
+    HAL_RCC_MCOConfig(RCC_MCO2, RCC_MCO2SOURCE_HSI48, RCC_MCO2DIV_1);
 }
 
 /* USER CODE BEGIN 4 */

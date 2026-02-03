@@ -13,11 +13,13 @@ namespace sensors {
 
 static uint32_t RESOLUTION = ADC_RESOLUTION12b;  // updated in Init()
 
-static uint32_t raw_adc[4] = {0};
+static uint32_t raw_adc[6] = {0};
 static int32_t temperature_degc = 0;
 static int32_t vbat_mv = 0;
 static int32_t vrefint_mv = 0;
-static int32_t supercap_mv = 0;
+static int32_t isense_mv = 0;
+static int32_t vsense_mv = 0;
+static int32_t fpga_isense_mv = 0;
 
 void Init(void) {
     RESOLUTION = hadc1.Init.Resolution;
@@ -39,10 +41,15 @@ void Update_10hz(void) {
         __HAL_ADC_CALC_DATA_TO_VOLTAGE(vrefint_mv, raw_adc[2], RESOLUTION) *
         VBAT_MULTIPLIER;
 
+    isense_mv =
+        __HAL_ADC_CALC_DATA_TO_VOLTAGE(vrefint_mv, raw_adc[3], RESOLUTION);
+    fpga_isense_mv =
+        __HAL_ADC_CALC_DATA_TO_VOLTAGE(vrefint_mv, raw_adc[4], RESOLUTION);
+
     // Supercapacitor voltage has a resistor divider
     constexpr int SUPERCAP_MULTIPLIER = 2;
-    supercap_mv =
-        __HAL_ADC_CALC_DATA_TO_VOLTAGE(vrefint_mv, raw_adc[3], RESOLUTION) *
+    vsense_mv =
+        __HAL_ADC_CALC_DATA_TO_VOLTAGE(vrefint_mv, raw_adc[5], RESOLUTION) *
         SUPERCAP_MULTIPLIER;
 }
 
@@ -59,7 +66,7 @@ int32_t GetVbatMv(void) {
 }
 
 int32_t GetSupercapMv(void) {
-    return supercap_mv;
+    return vsense_mv;
 }
 
 void PopulateStatus(sensor_status_t* msg) {

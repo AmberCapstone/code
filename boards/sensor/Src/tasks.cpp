@@ -66,7 +66,7 @@ void task_10hz(void* argument) {
         sensors::Update_10hz();
         serial::Update_10hz();
 
-        HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
+        HAL_GPIO_TogglePin(DEBUG_LED_GPIO_Port, DEBUG_LED_Pin);
         xTaskDelayUntil(&wake_time, pdMS_TO_TICKS(100));
     }
 }
