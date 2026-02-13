@@ -194,11 +194,6 @@ if __name__ == "__main__":
 
         time.sleep(0.002)
 
-    readout_filename = filename + ".ro"
-    with open(readout_filename, "wb") as f:
-        f.write(full_data)
-        print(f"Readout saved to {readout_filename}")
-
     pbar.refresh()
     pbar.close()
 
@@ -225,3 +220,8 @@ if __name__ == "__main__":
 
     stop_signal.set()
     rt.join()
+
+    readout_filename = filename + ".ro"
+    with open(readout_filename, "wb") as f:
+        f.write(full_data)
+        print(f"Readout saved to {readout_filename}")

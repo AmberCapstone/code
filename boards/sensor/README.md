@@ -6,7 +6,7 @@
 git submodule update --init --recursive
 ```
 
-Open `spi-flash.ioc` in CubeMX and click "Generate Code" to generate the `Drivers/` folder, then run `. post_cubemx.sh`.
+Open `sensor.ioc` in CubeMX and click "Generate Code" to generate the `Drivers/` folder, then run `. post_cubemx.sh`.
 
 ## Usage
 
@@ -19,7 +19,7 @@ Break out a USB wire and connect to a Nucleo-U083RC
 | GND  | GND   |
 | VBUS | N.C.  |
 
-Connect the M25PE SPI flash to the Nucleo.
+Connect the SPI flash to the Nucleo.
 
 | SPI    | STM32   | Description   |
 | :----- | :------ | :------------ |

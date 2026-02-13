@@ -175,6 +175,10 @@ void ReceivePage(sensor_flash_page_t* page) {
     next_page = *page;
 }
 
+void UpdateReadoutReqNumber(uint32_t req_number) {
+    readout_req_number = req_number;
+}
+
 // Accessors
 bool IsDone(void) {
     return state == SENSOR_FLASH_STATE_DONE;
@@ -198,10 +202,6 @@ void PopulateStatus(sensor_flash_status_t* msg) {
         default:
             break;
     }
-}
-
-void UpdateReadoutReqNumber(uint32_t req_number) {
-    readout_req_number = req_number;
 }
 
 }  // namespace flash

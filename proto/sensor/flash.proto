@@ -20,7 +20,5 @@ enum State {
 message Status {
     State state = 1;
     uint32 stm_page_request = 2;
-
-    // readout
-    Page readout_page = 7;
+    Page readout_page = 3;
 }
