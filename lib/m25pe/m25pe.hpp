@@ -1,18 +1,28 @@
 #pragma once
 
+#if __has_include(<cstdint>)
 #include <cstdint>
+#else
+#include <stdint.h>
+#endif
 
 #include "spi_master.hpp"
 
 // ======== M25PE ========
 // Caller is responsible for checking `IsWriteInProgress()` before starting a
 // new write operation.
-//
-// ==== Memory Layout ====
-// 512 Pages (256 bytes each)
-// 32 Subsectors (4096 bytes = 16 pages each)
-// 2 Sectors (65536 bytes = 16 subsectors each)
 namespace amber::m25pe {
+
+// ==== Memory Layout ====
+constexpr uint32_t PAGES_PER_SUBSECTOR = 16;
+constexpr uint32_t SUBSECTORS_PER_SECTOR = 16;
+constexpr uint32_t NUM_SECTORS = 2;
+
+// All sizes in bytes
+constexpr uint32_t PAGE_SIZE = 0x100;
+constexpr uint32_t SUBSECTOR_SIZE = PAGE_SIZE * PAGES_PER_SUBSECTOR;
+constexpr uint32_t SECTOR_SIZE = SUBSECTOR_SIZE * SUBSECTORS_PER_SECTOR;
+constexpr uint32_t TOTAL_SIZE = SECTOR_SIZE * NUM_SECTORS;
 
 enum StatusRegister {
     WIP = 0,
@@ -71,18 +81,21 @@ void ReadData(SpiMaster& spi, uint32_t address, uint32_t length, uint8_t* out);
 // ---------- Erase Commands ----------
 
 // Set all bits `address`'s page to 1
-// Each page has 0x100 bytes
 void PageErase(SpiMaster& spi, uint32_t address);
 
 // Set all bits in `address`'s subsector to 1
-// Each subsector has 0x1000 bytes
 void SubsectorErase(SpiMaster& spi, uint32_t address);
 
 // Set all bits in `address`'s sector to 1
-// Each sector has 0x10000 bytes
 void SectorErase(SpiMaster& spi, uint32_t address);
 
 // Set all bits to 1
 void BulkErase(SpiMaster& spi);
+
+// Three bytes
+// `u32 & 0xff` = Memory capacity
+// `(u32 >> 8) & 0xff` = Memory Type
+// `(u32 >> 16) & 0xff` = Manufacturer
+uint32_t ReadIdentification(SpiMaster& spi);
 
 }  // namespace amber::m25pe

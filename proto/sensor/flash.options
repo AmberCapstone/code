@@ -1,0 +1,5 @@
+sensor.* long_names: false
+
+# Page.data size is 256 to match the M25PE flash page size
+sensor.flash.Page.data max_size: 256
+sensor.flash.Page.data fixed_length: true

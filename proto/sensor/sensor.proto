@@ -1,0 +1,47 @@
+edition = "2023";
+
+package sensor;
+
+import "flash.proto";
+
+enum Action {
+    ACTION_NONE = 0;
+    ACTION_RESET = 1;
+    ACTION_FLASH = 2;
+    ACTION_READOUT = 3;
+}
+
+enum State {
+    STATE_UNKNOWN = 0;
+    STATE_IDLE = 1;
+    STATE_FLASHING = 2;
+    STATE_READOUT = 3;
+}
+
+message Command {
+    Action action = 1;
+    flash.Page page = 2;
+
+    uint32 host_page_request = 3; // only used in STATE_READOUT
+}
+
+
+message Status {
+    // Diagnostics
+    uint32 tx_counter = 1;
+    uint32 rx_counter = 2;
+    int32 temperature_degc = 3;
+    int32 vbat_mv = 4;
+    int32 vrefint_mv = 5;
+
+    State state = 6;
+
+    // Only used in STATE_FLASHING
+    flash.Status flash_status = 7;
+
+    uint32 micros = 8;
+
+    // sensors
+    uint32 supercap_mv = 10;
+    uint32 iload_ma = 11;
+}

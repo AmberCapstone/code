@@ -52,7 +52,7 @@ const uint8_t M25_CSn = 8;
 
 ArduinoSpi ard_spi{SPI, M25_CSn};
 
-uint8_t rx_buffer[256];
+uint8_t rx_buffer[m25pe::PAGE_SIZE];
 uint32_t rx_buffer_len;
 uint32_t address;
 
@@ -113,7 +113,8 @@ void loop() {
 
             switch (command) {
                 case 'W':  // 0x57
-                    rx_buffer_len = Serial.readBytes(rx_buffer, 256);
+                    rx_buffer_len =
+                        Serial.readBytes(rx_buffer, m25pe::PAGE_SIZE);
                     new_state = WRITING;
                     break;
                 case 'R':  // 0x52
@@ -152,7 +153,7 @@ void loop() {
         }
 
         case READING:
-            m25pe::ReadData(ard_spi, address, 256, rx_buffer);
+            m25pe::ReadData(ard_spi, address, m25pe::PAGE_SIZE, rx_buffer);
 
             for (int8_t row = 15; row >= 0; row--) {
                 for (int8_t col = 15; col >= 0; col--) {
