@@ -94,7 +94,8 @@ if __name__ == "__main__":
     if ser is None:
         exit(1)
 
-    bin = load_binary(sys.argv[1])
+    filename = sys.argv[1]
+    bin = load_binary(filename)
     if bin is None:
         exit(1)
 
@@ -122,28 +123,28 @@ if __name__ == "__main__":
     pbar = tqdm(total=TOTAL_SIZE, unit="byte", desc="Programming", ascii=" >=")
 
     last_tx_time = time.time()
-    sequence_number = -1
+    sequence_number = 0
     request_number = -1
 
     expected_crcs = [0] * NUM_PAGES
 
     while status.flash_status.state == flash.State.STATE_PROGRAMMING:
-        request_number = status.flash_status.page_request
+        request_number = status.flash_status.stm_page_request
 
         timeout = (time.time() - last_tx_time) > ARQ_TIMEOUT
-        if sequence_number < request_number or timeout:
-            if not timeout:
-                sequence_number += 1
+        if request_number > sequence_number or timeout:
+            if request_number > sequence_number:
+                sequence_number = request_number
                 pbar.update(PAGE_SIZE)
 
             idx = sequence_number * PAGE_SIZE
-            d = bin[idx : idx + PAGE_SIZE]
-            crc = binascii.crc32(sequence_number.to_bytes(4, "little") + d)
+            db: bytes = bin[idx : idx + PAGE_SIZE]
+            crc = binascii.crc32(sequence_number.to_bytes(4, "little") + db)
             expected_crcs[sequence_number] = crc
             command = Command(
                 page=flash.Page(
                     page_number=sequence_number,
-                    data=d,
+                    data=db,
                     crc=crc,
                 )
             )
@@ -156,33 +157,47 @@ if __name__ == "__main__":
     pbar.refresh()
     pbar.close()
 
+    while status.state != State.STATE_READOUT:
+        ser.write(pack(Command(action=Action.ACTION_READOUT)))
+        time.sleep(0.1)
+
     pbar = tqdm(total=NUM_PAGES, unit="page", desc="Verifying", ascii=" >=")
 
     request_number = 0
     errors = []
-    while status.flash_status.state == flash.State.STATE_VERIFYING:
-        command = Command(page_request=request_number)
+    full_data = bytearray()
+    while status.state == State.STATE_READOUT:
+        command = Command(host_page_request=request_number)
         ser.write(pack(command))
 
-        sn = status.flash_status.sequence_number
+        page = status.flash_status.readout_page
 
-        if sn >= NUM_PAGES:
+        if page is None:
             continue
 
-        if sn == request_number:
+        if page.page_number >= NUM_PAGES:
+            continue
+
+        if page.page_number == request_number:
             request_number += 1
             pbar.update(1)
-            if expected_crcs[sn] != status.flash_status.readout_crc:
+            full_data.extend(page.data)
+            if expected_crcs[page.page_number] != page.crc:
                 errors.append(
                     {
-                        "page": sn,
-                        "expected_crc": expected_crcs[sn],
-                        "actual_crc": status.flash_status.readout_crc,
-                        "data": status.flash_status.readout_page,
+                        "page": page.page_number,
+                        "expected_crc": expected_crcs[page.page_number],
+                        "actual_crc": page.crc,
+                        "data": page,
                     }
                 )
 
         time.sleep(0.002)
+
+    readout_filename = filename + ".ro"
+    with open(readout_filename, "wb") as f:
+        f.write(full_data)
+        print(f"Readout saved to {readout_filename}")
 
     pbar.refresh()
     pbar.close()

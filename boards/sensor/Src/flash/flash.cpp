@@ -15,28 +15,28 @@
 
 namespace flash {
 
-static int32_t request_number = 0;
+static uint32_t request_number = 0;
 static sensor_flash_state_t state = SENSOR_FLASH_STATE_UNKNOWN;
 static std::optional<sensor_flash_state_t> pending_transition = std::nullopt;
 static uint32_t state_elapsed_ms = 0;
 
-// Readout / verify
-static int32_t sequence_number = 0;
-static int32_t readout_req_number = 0;
-static uint32_t readout_crc = 0;
-
-static uint32_t id = 0;
+// Readout
+static uint32_t readout_req_number = 0;
 
 static SPI m25_spi(&hspi3, FLASH_CSn_GPIO_Port, FLASH_CSn_Pin);
-
-static uint32_t last_crc = 0;
-
-static bool writing = false;
 
 static sensor_flash_page_t next_page = SENSOR_FLASH_PAGE_INIT_ZERO;
 static sensor_flash_page_t readout_page = SENSOR_FLASH_PAGE_INIT_ZERO;
 
-uint8_t page_buf[256] = {0};
+static bool IsPagePopulated(sensor_flash_page_t* page) {
+    // Doesn't verify CRC of data == CRC field
+    return page->has_crc && page->has_data && page->has_page_number;
+}
+
+static uint32_t ComputePageCRC(sensor_flash_page_t* page) {
+    HAL_CRC_Calculate(&hcrc, &page->page_number, 4);
+    return HAL_CRC_Accumulate(&hcrc, (uint32_t*)page->data, 256) ^ 0xFFFFFFFF;
+}
 
 static void Transition(sensor_flash_state_t new_state) {
     pending_transition = new_state;
@@ -47,8 +47,6 @@ void Init(void) {
 
     HAL_GPIO_WritePin(FLASH_RESETn_GPIO_Port, FLASH_RESETn_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(FLASH_CSn_GPIO_Port, FLASH_CSn_Pin, GPIO_PIN_SET);
-
-    id = amber::m25pe::ReadIdentification(m25_spi);
 }
 
 void Start(void) {
@@ -56,14 +54,19 @@ void Start(void) {
     Transition(SENSOR_FLASH_STATE_ERASING);
 }
 
+void StartReadout(void) {
+    state = SENSOR_FLASH_STATE_UNKNOWN;
+    Transition(SENSOR_FLASH_STATE_READOUT);
+}
+
 void Update_1khz(void) {
     bool on_enter = false;
 
     if (pending_transition.has_value()) {
-        on_enter = true;
         state = *pending_transition;
-        state_elapsed_ms = 0;
         pending_transition.reset();
+        on_enter = true;
+        state_elapsed_ms = 0;
     }
 
     switch (state) {
@@ -72,9 +75,6 @@ void Update_1khz(void) {
             break;
 
         case SENSOR_FLASH_STATE_IDLE:
-            if (on_enter) {
-                request_number = -1;
-            }
             break;
 
         case SENSOR_FLASH_STATE_ERASING:
@@ -88,15 +88,16 @@ void Update_1khz(void) {
             }
             break;
 
-        case SENSOR_FLASH_STATE_PROGRAMMING:
+        case SENSOR_FLASH_STATE_PROGRAMMING: {
+            static bool writing;
+
             if (on_enter) {
                 request_number = 0;
                 writing = false;
             }
 
             if (!writing) {
-                if (!next_page.has_page_number || !next_page.has_data ||
-                    !next_page.has_crc) {
+                if (!IsPagePopulated(&next_page)) {
                     // Reject incomplete / absent packets
                     break;
                 }
@@ -106,15 +107,8 @@ void Update_1khz(void) {
                     break;
                 }
 
-                // cast is safe since page_number should always be positive
-                uint32_t pagenum_u32 =
-                    static_cast<uint32_t>(next_page.page_number);
-                HAL_CRC_Calculate(&hcrc, &pagenum_u32, 4);
-                last_crc =
-                    HAL_CRC_Accumulate(&hcrc, (uint32_t*)next_page.data, 256) ^
-                    0xFFFFFFFF;
-
-                if (last_crc != next_page.crc) {
+                uint32_t crc = ComputePageCRC(&next_page);
+                if (crc != next_page.crc) {
                     break;  // Reject corrupted packets
                 }
 
@@ -134,40 +128,41 @@ void Update_1khz(void) {
             }
 
             if (request_number >= flash::NUM_PAGES) {
-                Transition(SENSOR_FLASH_STATE_VERIFYING);
+                Transition(SENSOR_FLASH_STATE_DONE);
             }
-            break;
+        } break;
 
-        case SENSOR_FLASH_STATE_VERIFYING:
+        case SENSOR_FLASH_STATE_READOUT: {
+            static uint32_t last_page_loaded;
+
             if (on_enter) {
-                sequence_number = -1;
-                readout_req_number = -1;
+                last_page_loaded = UINT32_MAX;
+
+                readout_req_number = 0;
+                readout_page.page_number = 0;
             }
 
-            if (sequence_number < readout_req_number) {
-                sequence_number++;
-                amber::m25pe::ReadData(m25_spi, sequence_number * PAGE_SIZE,
-                                       PAGE_SIZE, page_buf);
+            readout_page.has_page_number = true;
+            if (readout_req_number > readout_page.page_number) {
+                readout_page.page_number = readout_req_number;
+            }
+
+            if (last_page_loaded != readout_page.page_number) {
                 readout_page.has_data = true;
-                memcpy(readout_page.data, page_buf, PAGE_SIZE);
+                amber::m25pe::ReadData(m25_spi,
+                                       readout_page.page_number * PAGE_SIZE,
+                                       PAGE_SIZE, readout_page.data);
 
-                readout_page.has_page_number = true;
-                uint32_t pagenum_u32 = static_cast<uint32_t>(sequence_number);
-                readout_page.page_number = pagenum_u32;
-
-                HAL_CRC_Calculate(&hcrc, &pagenum_u32, 4);
-                readout_crc =
-                    HAL_CRC_Accumulate(&hcrc, (uint32_t*)page_buf, PAGE_SIZE) ^
-                    0xffffffff;
                 readout_page.has_crc = true;
-                readout_page.crc = readout_crc;
+                readout_page.crc = ComputePageCRC(&readout_page);
+
+                last_page_loaded = readout_page.page_number;
             }
 
             if (readout_req_number == NUM_PAGES) {
                 Transition(SENSOR_FLASH_STATE_DONE);
             }
-
-            break;
+        } break;
 
         case SENSOR_FLASH_STATE_DONE:
             break;
@@ -188,25 +183,14 @@ bool IsDone(void) {
 void PopulateStatus(sensor_flash_status_t* msg) {
     msg->has_state = true;
     msg->state = state;
-    msg->has_id = true;
-    msg->id = id;
 
     switch (state) {
         case SENSOR_FLASH_STATE_PROGRAMMING:
-            msg->has_page_request = true;
-            msg->page_request = request_number;
-
-            msg->has_last_crc = true;
-            msg->last_crc = last_crc;
+            msg->has_stm_page_request = true;
+            msg->stm_page_request = request_number;
             break;
 
-        case SENSOR_FLASH_STATE_VERIFYING:
-            msg->has_sequence_number = true,
-            msg->sequence_number = sequence_number;
-
-            msg->has_readout_crc = true;
-            msg->readout_crc = readout_crc;
-
+        case SENSOR_FLASH_STATE_READOUT:
             msg->has_readout_page = true;
             msg->readout_page = readout_page;
             break;
@@ -216,7 +200,7 @@ void PopulateStatus(sensor_flash_status_t* msg) {
     }
 }
 
-void UpdateReadoutReqNumber(int32_t req_number) {
+void UpdateReadoutReqNumber(uint32_t req_number) {
     readout_req_number = req_number;
 }
 

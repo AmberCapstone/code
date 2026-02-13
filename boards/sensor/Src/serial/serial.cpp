@@ -55,15 +55,20 @@ void Init(void) {
     HAL_TIM_Base_Start(&htim7);  // micros timer for benchmarking
 }
 
+static bool GoFast(void) {
+    // Respond faster while flashing to speed up acknowledgements
+    return state_machine::GetState() == SENSOR_STATE_FLASHING ||
+           state_machine::GetState() == SENSOR_STATE_READOUT;
+}
+
 void Update_10hz(void) {
-    if (state_machine::GetState() != SENSOR_STATE_FLASHING) {
+    if (!GoFast()) {
         SendStatus();
     }
 }
 
 void Update_100hz(void) {
-    // Respond faster while flashing to speed up acknowledgements
-    if (state_machine::GetState() == SENSOR_STATE_FLASHING) {
+    if (GoFast()) {
         SendStatus();
     }
 }
@@ -125,8 +130,8 @@ void HandleCommand(sensor_command_t* cmd) {
         flash::ReceivePage(&cmd->page);  // 33 us
     }
 
-    if (cmd->has_page_request) {
-        flash::UpdateReadoutReqNumber(cmd->page_request);
+    if (cmd->has_host_page_request) {
+        flash::UpdateReadoutReqNumber(cmd->host_page_request);
     }
 
     last_command = *cmd;

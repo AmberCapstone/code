@@ -50,7 +50,11 @@ void Update_1khz(void) {
             break;
 
         case SENSOR_STATE_READOUT:
-            if (state_elapsed_ms > 5000) {
+            if (on_enter) {
+                flash::StartReadout();
+            }
+
+            if (flash::IsDone()) {
                 Transition(SENSOR_STATE_IDLE);
             }
             break;
