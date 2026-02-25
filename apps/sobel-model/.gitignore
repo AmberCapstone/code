@@ -1,0 +1,8 @@
+# Ignore generated images
+*.pgm
+*.png
+*.ppm
+*.yuv422
+
+# Allow images for README
+!doc/*
