@@ -8,38 +8,23 @@ int spi_cs = 10;
 SPISettings spi_settings(20000, LSBFIRST, SPI_MODE0);
 
 uint8_t spi_buf[512];
-uint8_t tx_cobs_buf[512];
+uint8_t tx_cobs_buf[cobs::MaxEncodedLength(512)];
+cobs::Decoder<512> decoder;
 
 void setup(void) {
     pinMode(spi_cs, OUTPUT);
-}
-
-void loop(void){
     digitalWrite(spi_cs, HIGH);
 
     Serial.begin(500000);
     SPI.begin();
+}
 
-    
-    cobs::Decoder<512> decoder;
-
-    // while (true) {
-    //     SPI.beginTransaction(spi_settings);
-    //     digitalWrite(spi_cs, LOW);
-    //     byte buf[4] = {0xAA, 0xBB, 0xCC, 0xDD};
-    //     SPI.transfer(buf, 4);
-    //     digitalWrite(spi_cs, HIGH);
-    //     SPI.endTransaction();
-    //     delay(100);
-    // }
-
-    
-
-    
-        // Receive COBS message from host
+void loop(void) {
+    // Receive COBS message from host
+    decoder.Reset();
     while (true) {
         int ibyte = Serial.read();
-        if(ibyte != -1) {
+        if (ibyte != -1) {
             uint8_t byte = static_cast<uint8_t>(ibyte);
             if (decoder.Decode(&byte, 1)) {
                 break;
@@ -49,9 +34,7 @@ void loop(void){
     // now know that decoder has a valid cobs message
 
     // perform a SPI transfer using decoder.
-    uint8_t exp[4] = {0x01, 0x02, 0x03, 0x03};
     memcpy(spi_buf, decoder.buffer, decoder.length);
-    memcpy(spi_buf, exp, 4);
     // SPI.beginTransaction(spi_settings);
     // digitalWrite(spi_cs, LOW);
     // SPI.transfer(spi_buf, decoder.length);
@@ -62,5 +45,4 @@ void loop(void){
     // Send response to host
     uint32_t tx_len = cobs::Encode(spi_buf, decoder.length, tx_cobs_buf);
     Serial.write(tx_cobs_buf, tx_len);
-    
 }

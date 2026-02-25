@@ -3,8 +3,9 @@ from __future__ import annotations
 import time
 import serial
 from cobs import Decoder, Encode
+import random
 
-PORT = "COM4"
+PORT = "/dev/ttyACM0"
 BAUD = 500_000
 
 # Opcodes https://github.com/damdoy/ice40_ultraplus_examples/blob/master/spi_hw/README.md
@@ -21,6 +22,7 @@ OPC_RD_32 = 0x09
 
 READ_LATENCY = 4
 
+
 def read_frame(ser: serial.Serial, timeout_s: float = 1) -> bytes | None:
     dec = Decoder()
     deadline = time.time() + timeout_s
@@ -32,41 +34,50 @@ def read_frame(ser: serial.Serial, timeout_s: float = 1) -> bytes | None:
         if dec.Decode(chunk):
             payload = bytes(dec.output)
             return payload
-        
+
     return None
+
 
 def send_frame(ser: serial.Serial, payload: bytes) -> None:
     print("payload:", payload.hex(" "))
     encoded = bytes(Encode(payload))
     ser.write(encoded)
 
+
 def cmd_init() -> bytes:
-    return bytes ([OPC_INIT, 0, 0, 0, 0, 0, 0, 0x11])
+    return bytes([OPC_INIT, 0, 0, 0, 0, 0, 0, 0x11])
+
 
 def cmd_led(val: int) -> bytes:
     return bytes([OPC_LEDS, val & 0xFF, 0xAA, 0xAA, 0xAA, 0xAA, 0xBB, 0xBB, 0xBB, 0xBB])
+
 
 def cmd_inv32(data4: bytes) -> bytes:
     assert len(data4) == 4
     return bytes((OPC_INV32, data4[0], data4[1], data4[2], data4[3], 0, 0, 0))
 
+
 def cmd_wr_32_chunk(chunk4: bytes) -> bytes:
     assert len(chunk4) == 4
     return bytes([OPC_WR_32_CHUNK, *chunk4, 0, 0, 0])
 
+
 def cmd_rd_32_chunk() -> bytes:
     return bytes([OPC_RD_32_CHUNK, 0, 0, 0, 0, 0, 0, 0])
+
 
 def extract_data4(resp: bytes) -> bytes | None:
     if resp is None or len(resp) < 8:
         return None
     return resp[4:8]
 
+
 def wr_32_chunk(ser: serial.Serial, vec16: bytes) -> None:
     assert len(vec16) == 16
     for i in range(0, 16, 4):
-        send_frame(ser, cmd_wr_32_chunk(vec16[i:i+4]))
+        send_frame(ser, cmd_wr_32_chunk(vec16[i : i + 4]))
         _ = read_frame(ser, timeout_s=1.0)
+
 
 def rd_32_chunk(ser: serial.Serial) -> bytes:
     out = bytearray()
@@ -79,32 +90,33 @@ def rd_32_chunk(ser: serial.Serial) -> bytes:
         out += d
     return bytes(out)
 
+
 def cmd_wr_32(addr: int, data: bytes) -> bytes:
     assert 0 <= addr <= 0xFF
     return bytes([OPC_WR_32, addr & 0xFF, 0x00]) + data
+
 
 def cmd_rd_32(addr: int, n: int) -> bytes:
     assert 0 <= addr <= 0xFF
     return bytes([OPC_RD_32, addr & 0xFF, 0x00]) + bytes(16)
 
+
 def main():
     with serial.Serial(PORT, baudrate=BAUD, timeout=0.5) as ser:
         print(f"Connected to {PORT} @ {BAUD} baud")
-
-        time.sleep(2.0)
 
         ser.reset_input_buffer()
         ser.reset_output_buffer()
 
         while True:
-            to_send = Encode(bytes([0x01, 0x02, 0x03, 0x04]))
-            print("Sending: ", to_send)
+            data = random.randbytes(512)
+            to_send = Encode(data)
             ser.write(to_send)
-            rx = ser.read_until(b'\0')
-            print(rx)
-            # dec = Decoder()
-            # dec.Decode(rx)
-            # print(dec.output)
+            rx = ser.read_until(b"\0")
+            dec = Decoder()
+            dec.Decode(rx)
+            print(rx.hex())
+            print(dec.output == data)
             time.sleep(0.5)
 
         send_frame(ser, cmd_init())
@@ -147,8 +159,14 @@ def main():
             # Try to extract bytes 1..4 as the returned/inverted data
             if len(got) >= 5:
                 got_data = got[3:7]
-                ok = (got_data == expect)
-                print("  got:", got_data.hex(" "), " expected:", expect.hex(" "), " OK" if ok else " FAIL")
+                ok = got_data == expect
+                print(
+                    "  got:",
+                    got_data.hex(" "),
+                    " expected:",
+                    expect.hex(" "),
+                    " OK" if ok else " FAIL",
+                )
             else:
                 print("  resp too short to check inversion")
 
@@ -165,7 +183,6 @@ def main():
 
         # print("VEC OK" if got == vec else "VEC FAIL")
 
-
         # data = bytes.fromhex("FF FF FF FF  00 00 00 00  FF FF FF FF  00 00 00 00")
         data = bytes.fromhex("AA AA AA AA AA AA AA AA")
         send_frame(ser, cmd_wr_32(0x00, data))
@@ -175,6 +192,7 @@ def main():
         send_frame(ser, cmd_rd_32(0x00, len(data)))
         resp = read_frame(ser)
         print("Receivd:", resp.hex(" "))
+
 
 if __name__ == "__main__":
     main()
