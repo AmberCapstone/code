@@ -6,8 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "cobs",
-    "matplotlib>=3.10.8",
-    "numpy>=2.4.2",
     "pyserial>=3.5",
 ]
 
