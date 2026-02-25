@@ -35,11 +35,11 @@ void loop(void) {
 
     // perform a SPI transfer using decoder.
     memcpy(spi_buf, decoder.buffer, decoder.length);
-    // SPI.beginTransaction(spi_settings);
-    // digitalWrite(spi_cs, LOW);
-    // SPI.transfer(spi_buf, decoder.length);
-    // digitalWrite(spi_cs, HIGH);
-    // SPI.endTransaction();
+    SPI.beginTransaction(spi_settings);
+    digitalWrite(spi_cs, LOW);
+    SPI.transfer(spi_buf, decoder.length);
+    digitalWrite(spi_cs, HIGH);
+    SPI.endTransaction();
     // spi_buf now holds the RX data from the FPGA
 
     // Send response to host

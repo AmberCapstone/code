@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 import time
 import serial
+import itertools
 from cobs import Decoder, Encode
 
 PORT = "/dev/ttyUSB0"
@@ -105,25 +106,25 @@ def main():
         ser.reset_input_buffer()
         ser.reset_output_buffer()
 
-        while True:
-            data = random.randbytes(512)
-            send_frame(ser, data)
-            rx = read_frame(ser)
-            print(rx == data)
-            time.sleep(0.5)
+        # while True:
+        #     data = random.randbytes(512)
+        #     send_frame(ser, data)
+        #     rx = read_frame(ser)
+        #     print(rx == data)
+        #     time.sleep(0.5)
 
         send_frame(ser, cmd_init())
-        resp = read_frame(ser, timeout_s=1.0)
+        resp = read_frame(ser)
         print("INIT resp:", resp.hex(" ") if resp else "<timeout>")
 
         time.sleep(0.5)
 
         # LED cycle
-        for val in [0x01, 0x02, 0x04, 0x03, 0x05, 0x07, 0x00]:
+        for val in itertools.cycle([0x01, 0x02, 0x04, 0x03, 0x05, 0x07, 0x00]):
             send_frame(ser, cmd_led(val))
-            resp = read_frame(ser, timeout_s=1.0)
+            resp = read_frame(ser)
             print(f"LEDS {val:02x} resp:", resp.hex(" ") if resp else "<timeout>")
-            time.sleep(0.3)
+            time.sleep(1)
 
         # INV32 tests
         tests = [
@@ -137,7 +138,7 @@ def main():
 
         for raw, expect in tests:
             send_frame(ser, cmd_inv32(raw))
-            resp = read_frame(ser, timeout_s=1.0)
+            resp = read_frame(ser)
 
             if not resp:
                 print("INV32 resp: <timeout>")
@@ -179,7 +180,7 @@ def main():
         # data = bytes.fromhex("FF FF FF FF  00 00 00 00  FF FF FF FF  00 00 00 00")
         data = bytes.fromhex("AA AA AA AA AA AA AA AA")
         send_frame(ser, cmd_wr_32(0x00, data))
-        resp = read_frame(ser, timeout_s=2.0)
+        resp = read_frame(ser)
         print("WR resp:", resp.hex(" ") if resp else "<timeout>")
 
         send_frame(ser, cmd_rd_32(0x00, len(data)))
