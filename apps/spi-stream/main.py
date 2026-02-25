@@ -31,7 +31,7 @@ def read_frame(ser: serial.Serial, timeout_s: float = 1) -> bytes | None:
     if dec.Decode(rx):
         return dec.output
     else:
-        print("Received invalid COBS frame")
+        print("Received invalid COBS frame", rx.hex(" "))
         return None
 
 
@@ -98,7 +98,7 @@ def cmd_rd_32(addr: int, n: int) -> bytes:
 
 
 def main():
-    with serial.Serial(PORT, baudrate=BAUD, timeout=0.5) as ser:
+    with serial.Serial(PORT, baudrate=BAUD, timeout=1.0) as ser:
         print(f"Connected to {PORT} @ {BAUD} baud")
 
         time.sleep(2)
@@ -113,9 +113,12 @@ def main():
         #     print(rx == data)
         #     time.sleep(0.5)
 
-        send_frame(ser, cmd_init())
-        resp = read_frame(ser)
-        print("INIT resp:", resp.hex(" ") if resp else "<timeout>")
+        resp = None
+
+        while resp is None:
+            send_frame(ser, cmd_init())
+            resp = read_frame(ser)
+            print("INIT resp:", resp.hex(" ") if resp else "<timeout>")
 
         time.sleep(0.5)
 
@@ -124,7 +127,7 @@ def main():
             send_frame(ser, cmd_led(val))
             resp = read_frame(ser)
             print(f"LEDS {val:02x} resp:", resp.hex(" ") if resp else "<timeout>")
-            time.sleep(1)
+            time.sleep(0.5)
 
         # INV32 tests
         tests = [
