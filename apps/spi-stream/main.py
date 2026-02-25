@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import random
 import time
 import serial
 from cobs import Decoder, Encode
-import random
 
-PORT = "/dev/ttyACM0"
+PORT = "/dev/ttyUSB0"
 BAUD = 500_000
 
 # Opcodes https://github.com/damdoy/ice40_ultraplus_examples/blob/master/spi_hw/README.md
@@ -25,23 +25,18 @@ READ_LATENCY = 4
 
 def read_frame(ser: serial.Serial, timeout_s: float = 1) -> bytes | None:
     dec = Decoder()
-    deadline = time.time() + timeout_s
 
-    while time.time() < deadline:
-        chunk = ser.read(256)
-        if not chunk:
-            continue
-        if dec.Decode(chunk):
-            payload = bytes(dec.output)
-            return payload
-
-    return None
+    rx = ser.read_until(b"\0")
+    if dec.Decode(rx):
+        return dec.output
+    else:
+        print("Received invalid COBS frame")
+        return None
 
 
 def send_frame(ser: serial.Serial, payload: bytes) -> None:
     print("payload:", payload.hex(" "))
-    encoded = bytes(Encode(payload))
-    ser.write(encoded)
+    ser.write(Encode(payload))
 
 
 def cmd_init() -> bytes:
@@ -105,18 +100,16 @@ def main():
     with serial.Serial(PORT, baudrate=BAUD, timeout=0.5) as ser:
         print(f"Connected to {PORT} @ {BAUD} baud")
 
+        time.sleep(2)
+
         ser.reset_input_buffer()
         ser.reset_output_buffer()
 
         while True:
             data = random.randbytes(512)
-            to_send = Encode(data)
-            ser.write(to_send)
-            rx = ser.read_until(b"\0")
-            dec = Decoder()
-            dec.Decode(rx)
-            print(rx.hex())
-            print(dec.output == data)
+            send_frame(ser, data)
+            rx = read_frame(ser)
+            print(rx == data)
             time.sleep(0.5)
 
         send_frame(ser, cmd_init())
