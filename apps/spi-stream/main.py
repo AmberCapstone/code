@@ -6,7 +6,7 @@ import serial
 import itertools
 from cobs import Decoder, Encode
 
-PORT = "/dev/ttyUSB0"
+PORT = "COM3"
 BAUD = 500_000
 
 # Opcodes https://github.com/damdoy/ice40_ultraplus_examples/blob/master/spi_hw/README.md
@@ -21,7 +21,14 @@ OPC_RD_32_CHUNK = 0x07
 OPC_WR_32 = 0x08
 OPC_RD_32 = 0x09
 
+OPC_WR = 0x01
+OPC_RD = 0x02
+
 READ_LATENCY = 4
+
+WIDTH = 320
+HEIGHT = 100
+PIXELS = HEIGHT * WIDTH
 
 
 def read_frame(ser: serial.Serial, timeout_s: float = 1) -> bytes | None:
@@ -36,7 +43,7 @@ def read_frame(ser: serial.Serial, timeout_s: float = 1) -> bytes | None:
 
 
 def send_frame(ser: serial.Serial, payload: bytes) -> None:
-    print("payload:", payload.hex(" "))
+    # print("payload:", payload.hex(" "))
     ser.write(Encode(payload))
 
 
@@ -101,10 +108,12 @@ def main():
     with serial.Serial(PORT, baudrate=BAUD, timeout=1.0) as ser:
         print(f"Connected to {PORT} @ {BAUD} baud")
 
-        time.sleep(2)
+        time.sleep(1)
 
         ser.reset_input_buffer()
         ser.reset_output_buffer()
+
+        time.sleep(1)
 
         # while True:
         #     data = random.randbytes(512)
@@ -113,82 +122,144 @@ def main():
         #     print(rx == data)
         #     time.sleep(0.5)
 
-        resp = None
-
-        while resp is None:
-            send_frame(ser, cmd_init())
+        addr = 0
+        data_buf = []
+        for i in range(0, PIXELS, WIDTH):
+            addr = i
+            data = random.randbytes(WIDTH)
+            data_buf.append((addr, data))
+            # print("sending data: ", data.hex(" "))
+            print("addr:", addr)
+            addr_hi = (addr >> 8) & 0xFF
+            addr_lo = addr & 0xFF
+            payload = bytes([OPC_WR, addr_hi, addr_lo]) + data
+            send_frame(ser, payload)
             resp = read_frame(ser)
-            print("INIT resp:", resp.hex(" ") if resp else "<timeout>")
+            # print("resp = ", resp.hex(" " if resp else "no resp on write"))
+            time.sleep(0.01)
 
-        time.sleep(0.5)
-
-        # LED cycle
-        for val in itertools.cycle([0x01, 0x02, 0x04, 0x03, 0x05, 0x07, 0x00]):
-            send_frame(ser, cmd_led(val))
+        for addr, data in data_buf:
+            addr_hi = (addr >> 8) & 0xFF
+            addr_lo = addr & 0xFF
+            payload = bytes([OPC_RD, addr_hi, addr_lo]) + bytes([0x00]*WIDTH)
+            send_frame(ser, payload)
             resp = read_frame(ser)
-            print(f"LEDS {val:02x} resp:", resp.hex(" ") if resp else "<timeout>")
-            time.sleep(0.5)
-
-        # INV32 tests
-        tests = [
-            (bytes([0x00, 0x00, 0x00, 0x00]), bytes([0xFF, 0xFF, 0xFF, 0xFF])),
-            (bytes([0xFF, 0xFF, 0xFF, 0xFF]), bytes([0x00, 0x00, 0x00, 0x00])),
-            (bytes([0xAA, 0xAA, 0xAA, 0xAA]), bytes([0x55, 0x55, 0x55, 0x55])),
-            (bytes([0x12, 0x34, 0x56, 0x78]), bytes([0xED, 0xCB, 0xA9, 0x87])),
-        ]
-
-        # WRITE/READ VEC TESTS
-
-        for raw, expect in tests:
-            send_frame(ser, cmd_inv32(raw))
-            resp = read_frame(ser)
-
-            if not resp:
-                print("INV32 resp: <timeout>")
-                continue
-
-            # Response format depends on your FPGA design,
-            # but in your verilog you were echoing opcode in byte0,
-            # then data bytes following.
-            got = resp
-            print("INV32 raw resp:", got.hex(" "))
-
-            # Try to extract bytes 1..4 as the returned/inverted data
-            if len(got) >= 5:
-                got_data = got[3:7]
-                ok = got_data == expect
-                print(
-                    "  got:",
-                    got_data.hex(" "),
-                    " expected:",
-                    expect.hex(" "),
-                    " OK" if ok else " FAIL",
-                )
+            if (resp [3:(3+WIDTH)] == data):
+                print ("addr:", addr, "\tpass")
             else:
-                print("  resp too short to check inversion")
+                print("addr: ", addr, "fail: response: ", resp.hex(" "), "expected: ", data.hex(" "))
 
-            time.sleep(0.5)
+            # print("resp = ", resp.hex(" ") if resp else "<timeout>")
 
-        # # Vector test (16 bytes)
-        # vec = bytes.fromhex("00 01 02 03  10 11 12 13  20 21 22 23  30 31 32 33")
+            time.sleep(0.01)
 
-        # print("Writing vector:", vec.hex(" "))
-        # wr_32_chunk(ser, vec)
 
-        # got = rd_32_chunk(ser)
-        # print("Read vector   :", got.hex(" "))
 
-        # print("VEC OK" if got == vec else "VEC FAIL")
 
-        # data = bytes.fromhex("FF FF FF FF  00 00 00 00  FF FF FF FF  00 00 00 00")
-        data = bytes.fromhex("AA AA AA AA AA AA AA AA")
-        send_frame(ser, cmd_wr_32(0x00, data))
-        resp = read_frame(ser)
-        print("WR resp:", resp.hex(" ") if resp else "<timeout>")
 
-        send_frame(ser, cmd_rd_32(0x00, len(data)))
-        resp = read_frame(ser)
-        print("Receivd:", resp.hex(" "))
+
+
+        # while True: 
+        #     data = random.randbytes(WIDTH)
+        #     print("sending data: ", data.hex(" "))
+        #     addr_hi = (addr >> 8) & 0xFF
+        #     addr_lo = addr & 0xFF
+        #     payload = bytes([OPC_WR, addr_hi, addr_lo]) + data
+        #     send_frame(ser, payload)
+        #     resp = read_frame(ser)
+        #     # print("resp = ", resp.hex(" " if resp else "no resp on write"))
+
+        #     time.sleep(0.2)
+        #     payload = bytes([OPC_RD, addr_hi, addr_lo]) + bytes([0x00]*WIDTH)
+        #     send_frame(ser, payload)
+        #     resp = read_frame(ser)
+        #     if (resp [3:(3+WIDTH)] == data):
+        #         print ("Pass")
+        #     else:
+        #         print("Fail: response: ", resp.hex(" "), "expected: ", data.hex(" "))
+
+        #     # print("resp = ", resp.hex(" ") if resp else "<timeout>")
+
+        #     time.sleep(0.2)
+
+
+
+        # resp = None
+
+        # while resp is None:
+        #     send_frame(ser, cmd_init())
+        #     resp = read_frame(ser)
+        #     print("INIT resp:", resp.hex(" ") if resp else "<timeout>")
+
+        # time.sleep(0.5)
+
+        # # LED cycle
+        # for val in itertools.cycle([0x01, 0x02, 0x04, 0x03, 0x05, 0x07, 0x00]):
+        #     send_frame(ser, cmd_led(val))
+        #     resp = read_frame(ser)
+        #     print(f"LEDS {val:02x} resp:", resp.hex(" ") if resp else "<timeout>")
+        #     time.sleep(0.5)
+
+        # # INV32 tests
+        # tests = [
+        #     (bytes([0x00, 0x00, 0x00, 0x00]), bytes([0xFF, 0xFF, 0xFF, 0xFF])),
+        #     (bytes([0xFF, 0xFF, 0xFF, 0xFF]), bytes([0x00, 0x00, 0x00, 0x00])),
+        #     (bytes([0xAA, 0xAA, 0xAA, 0xAA]), bytes([0x55, 0x55, 0x55, 0x55])),
+        #     (bytes([0x12, 0x34, 0x56, 0x78]), bytes([0xED, 0xCB, 0xA9, 0x87])),
+        # ]
+
+        # # WRITE/READ VEC TESTS
+
+        # for raw, expect in tests:
+        #     send_frame(ser, cmd_inv32(raw))
+        #     resp = read_frame(ser)
+
+        #     if not resp:
+        #         print("INV32 resp: <timeout>")
+        #         continue
+
+        #     # Response format depends on your FPGA design,
+        #     # but in your verilog you were echoing opcode in byte0,
+        #     # then data bytes following.
+        #     got = resp
+        #     print("INV32 raw resp:", got.hex(" "))
+
+        #     # Try to extract bytes 1..4 as the returned/inverted data
+        #     if len(got) >= 5:
+        #         got_data = got[3:7]
+        #         ok = got_data == expect
+        #         print(
+        #             "  got:",
+        #             got_data.hex(" "),
+        #             " expected:",
+        #             expect.hex(" "),
+        #             " OK" if ok else " FAIL",
+        #         )
+        #     else:
+        #         print("  resp too short to check inversion")
+
+        #     time.sleep(0.5)
+
+        # # # Vector test (16 bytes)
+        # # vec = bytes.fromhex("00 01 02 03  10 11 12 13  20 21 22 23  30 31 32 33")
+
+        # # print("Writing vector:", vec.hex(" "))
+        # # wr_32_chunk(ser, vec)
+
+        # # got = rd_32_chunk(ser)
+        # # print("Read vector   :", got.hex(" "))
+
+        # # print("VEC OK" if got == vec else "VEC FAIL")
+
+        # # data = bytes.fromhex("FF FF FF FF  00 00 00 00  FF FF FF FF  00 00 00 00")
+        # data = bytes.fromhex("AA AA AA AA AA AA AA AA")
+        # send_frame(ser, cmd_wr_32(0x00, data))
+        # resp = read_frame(ser)
+        # print("WR resp:", resp.hex(" ") if resp else "<timeout>")
+
+        # send_frame(ser, cmd_rd_32(0x00, len(data)))
+        # resp = read_frame(ser)
+        # print("Receivd:", resp.hex(" "))
 
 
 if __name__ == "__main__":
