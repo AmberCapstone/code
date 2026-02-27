@@ -4,6 +4,8 @@ import random
 import time
 import serial
 import itertools
+import numpy as np
+import matplotlib.pyplot as plt
 from cobs import Decoder, Encode
 
 PORT = "COM3"
@@ -26,10 +28,26 @@ OPC_RD = 0x02
 
 READ_LATENCY = 4
 
-WIDTH = 320
-HEIGHT = 100
+WIDTH = 28
+HEIGHT = 28
 PIXELS = HEIGHT * WIDTH
 
+def load_mnist_image(filename: str, index: int) -> bytes:
+    with open(filename, "rb") as f:
+        f.read(16) # header
+        buf = f.read()
+
+    data = np.frombuffer(buf, dtype=np.uint8)
+    images = data.reshape(-1, 28, 28)
+    
+    img = images[index]
+
+    plt.figure("MNIST", clear=True)
+    plt.imshow(img, cmap='gray')
+    # plt.show()
+    # plt.show(block=False)
+    # plt.pause(1)
+    return img.flatten().tobytes()
 
 def read_frame(ser: serial.Serial, timeout_s: float = 1) -> bytes | None:
     dec = Decoder()
@@ -113,45 +131,97 @@ def main():
         ser.reset_input_buffer()
         ser.reset_output_buffer()
 
-        time.sleep(1)
+        while True:
 
-        # while True:
-        #     data = random.randbytes(512)
-        #     send_frame(ser, data)
-        #     rx = read_frame(ser)
-        #     print(rx == data)
-        #     time.sleep(0.5)
+            print("Loading MNIST image")
+            mnist_bytes = load_mnist_image("train-images-idx3-ubyte", index=2)
+            assert len(mnist_bytes) == 784
 
-        addr = 0
-        data_buf = []
-        for i in range(0, PIXELS, WIDTH):
-            addr = i
-            data = random.randbytes(WIDTH)
-            data_buf.append((addr, data))
-            # print("sending data: ", data.hex(" "))
-            print("addr:", addr)
-            addr_hi = (addr >> 8) & 0xFF
-            addr_lo = addr & 0xFF
-            payload = bytes([OPC_WR, addr_hi, addr_lo]) + data
-            send_frame(ser, payload)
-            resp = read_frame(ser)
-            # print("resp = ", resp.hex(" " if resp else "no resp on write"))
-            time.sleep(0.01)
+            time.sleep(1)
 
-        for addr, data in data_buf:
-            addr_hi = (addr >> 8) & 0xFF
-            addr_lo = addr & 0xFF
-            payload = bytes([OPC_RD, addr_hi, addr_lo]) + bytes([0x00]*WIDTH)
-            send_frame(ser, payload)
-            resp = read_frame(ser)
-            if (resp [3:(3+WIDTH)] == data):
-                print ("addr:", addr, "\tpass")
-            else:
-                print("addr: ", addr, "fail: response: ", resp.hex(" "), "expected: ", data.hex(" "))
+            # while True:
+            #     data = random.randbytes(512)
+            #     send_frame(ser, data)
+            #     rx = read_frame(ser)
+            #     print(rx == data)
+            #     time.sleep(0.5)
+            start = 0
+            for i in range(start, PIXELS, WIDTH):
+                addr = i
+                data = mnist_bytes[addr : addr + WIDTH]
+                print("addr:", addr, "\tsending data: ", data.hex(" "))
+                # print("addr:", addr)
+                addr_hi = (addr >> 8) & 0xFF
+                addr_lo = addr & 0xFF
+                payload = bytes([OPC_WR, addr_hi, addr_lo]) + data
+                send_frame(ser, payload)
+                resp = read_frame(ser)
+                # print("resp = ", resp.hex(" " if resp else "no resp on write"))
+                time.sleep(0.01)
 
-            # print("resp = ", resp.hex(" ") if resp else "<timeout>")
+            for i in range(start, PIXELS, WIDTH):
+                addr = i
+                data = mnist_bytes[addr : addr + WIDTH]
+                addr_hi = (addr >> 8) & 0xFF
+                addr_lo = addr & 0xFF
+                payload = bytes([OPC_RD, addr_hi, addr_lo]) + bytes([0x00]*WIDTH)
+                send_frame(ser, payload)
+                resp = read_frame(ser)
+                if (resp [3:(3+WIDTH)] == data):
+                    print ("addr:", addr, "\tpass", "data:", resp.hex(" "))
+                else:
+                    print("addr: ", addr, "fail: response: ", resp.hex(" "), "expected: ", data.hex(" "))
 
-            time.sleep(0.01)
+                # print("resp = ", resp.hex(" ") if resp else "<timeout>")
+
+                time.sleep(0.01)
+
+                
+            print("Loading MNIST image")
+            mnist_bytes = load_mnist_image("train-images-idx3-ubyte", index=3)
+            assert len(mnist_bytes) == 784
+
+            time.sleep(1)
+
+            # while True:
+            #     data = random.randbytes(512)
+            #     send_frame(ser, data)
+            #     rx = read_frame(ser)
+            #     print(rx == data)
+            #     time.sleep(0.5)
+
+            start = 785
+            for i in range(0, PIXELS, WIDTH):
+                addr = i + start
+                data = mnist_bytes[addr - start : addr - start + WIDTH]
+                print("addr:", addr, "\tsending data: ", data.hex(" "))
+                # print("addr:", addr)
+                addr_hi = (addr >> 8) & 0xFF
+                addr_lo = addr & 0xFF
+                payload = bytes([OPC_WR, addr_hi, addr_lo]) + data
+                send_frame(ser, payload)
+                resp = read_frame(ser)
+                # print("resp = ", resp.hex(" " if resp else "no resp on write"))
+                time.sleep(0.01)
+
+            for i in range(0, PIXELS, WIDTH):
+                addr = i + start
+                data = mnist_bytes[addr - start : addr - start + WIDTH]
+                addr_hi = (addr >> 8) & 0xFF
+                addr_lo = addr & 0xFF
+                payload = bytes([OPC_RD, addr_hi, addr_lo]) + bytes([0x00]*WIDTH)
+                send_frame(ser, payload)
+                resp = read_frame(ser)
+                if (resp [3:(3+WIDTH)] == data):
+                    print ("addr:", addr, "\tpass", "data:", resp.hex(" "))
+                else:
+                    print("addr: ", addr, "fail: response: ", resp.hex(" "), "expected: ", data.hex(" "))
+
+                # print("resp = ", resp.hex(" ") if resp else "<timeout>")
+
+                time.sleep(0.01)
+
+
 
 
 
