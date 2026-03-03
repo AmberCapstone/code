@@ -3,6 +3,9 @@ syntax = "proto3";
 package sensor;
 
 import "sensor/flash.proto";
+import "sensor/camera.proto";
+import "sensor/measure.proto";
+import "sensor/parameters.proto";
 
 enum Action {
     ACTION_NONE = 0;
@@ -30,18 +33,11 @@ message Status {
     // Diagnostics
     optional uint32 tx_counter = 1;
     optional uint32 rx_counter = 2;
-    optional int32 temperature_degc = 3;
-    optional int32 vbat_mv = 4;
-    optional int32 vrefint_mv = 5;
+    Measurement measurement = 3;
+    fixed64 alerts = 4; // bitfield representing Alerts enum
 
     optional State state = 6;
 
     // Only used in STATE_FLASHING
     optional flash.Status flash_status = 7;
-
-    optional uint32 micros = 8;
-
-    // sensors
-    optional uint32 supercap_mv = 10;
-    optional uint32 iload_ma = 11;
 }

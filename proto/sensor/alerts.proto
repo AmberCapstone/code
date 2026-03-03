@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package sensor;
+
+enum Alert {
+    // Power: 0x00-0x0F
+    LOW_INPUT_POWER = 0x00;
+    NO_INPUT_POWER = 0x01;
+    LOW_CHARGE = 0x02;
+
+    // Camera: 0x10-0x17
+    CAMERA_NOT_RESPONDING_I2C = 0x10;
+    CAMERA_IMAGE_TIMEOUT = 0x11;
+
+    // FPGA: 0x20-0x2F
+    FPGA_NOT_CONFIGURING = 0x20;
+    FPGA_DATA_TIMEOUT = 0x21;
+
+    // Microcontroller: 0x30-0x3f
+    WATCHDOG_RESET = 0x30;
+
+}
+
