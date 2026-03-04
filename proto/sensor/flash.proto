@@ -1,11 +1,11 @@
-edition = "2023";
+syntax = "proto3";
 
 package sensor.flash;
 
 message Page {
-    uint32 page_number = 1;
-    bytes data = 2;
-    fixed32 crc = 3; // CRC32 of page_number (4 bytes, little endian) then data (256 bytes)
+    optional uint32 page_number = 1;
+    optional bytes data = 2;
+    optional fixed32 crc = 3; // CRC32 of page_number (4 bytes, little endian) then data (256 bytes)
 }
 
 enum State {
@@ -18,7 +18,7 @@ enum State {
 }
 
 message Status {
-    State state = 1;
-    uint32 stm_page_request = 2;
-    Page readout_page = 3;
+    optional State state = 1;
+    optional uint32 stm_page_request = 2;
+    optional Page readout_page = 3;
 }
