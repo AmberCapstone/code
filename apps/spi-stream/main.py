@@ -34,6 +34,27 @@ WIDTH = 320
 HEIGHT = 240
 PIXELS = HEIGHT * WIDTH
 
+def load_image_as_qvga_y_bytes(filename: str) -> bytes:
+    img = Image.open(filename).convert("RGB")
+    img = img.resize((WIDTH, HEIGHT))
+
+    arr = np.asarray(img, dtype=np.uint16)
+    r = arr[:, :, 0]
+    g = arr[:, :, 1]
+    b = arr[:, :, 2]
+
+    # Integer approximation of Y' = 0.299R + 0.587G + 0.114B
+    y = ((77 * r) + (150 * g) + (29 * b)) >> 8
+
+    return y.astype(np.uint8).tobytes()
+
+def save_qvga_y_bytes_as_image(frame_bytes: bytes, filename: str) -> None:
+    if len(frame_bytes) != WIDTH * HEIGHT:
+        raise ValueError(f"Expected {WIDTH*HEIGHT} bytes, got {len(frame_bytes)}")
+
+    img = Image.frombytes("L", (WIDTH, HEIGHT), frame_bytes)
+    img.save(filename)
+    print(f"Saved preview image to {filename}")
 
 def save_framebuffer_as_image(
     frame_bytes: bytes, width: int, height: int, filename: str
@@ -106,15 +127,19 @@ def main():
         send_frame(ser, test_payload)
         _ = read_frame(ser)
 
+        image_bytes = load_image_as_qvga_y_bytes("focus_chart.png")
+        save_qvga_y_bytes_as_image(image_bytes, "input_qvga_y_preview.png")
         written_rows: list[bytes] = []
 
         start = 0
-        for i in range(0, PIXELS//2, WIDTH//2):
-            addr = i + start
-            addr_hi = (addr >> 8) & 0xFF
-            addr_lo = addr & 0xFF
+        for row in range(HEIGHT):
+            byte_offset = row * WIDTH
+            sram_addr = start + (byte_offset//2)
+            addr_hi = (sram_addr >> 8) & 0xFF
+            addr_lo = sram_addr & 0xFF
 
-            data = random.randbytes(WIDTH)
+            # data = random.randbytes(WIDTH)
+            data = image_bytes[byte_offset : byte_offset + WIDTH]
             written_rows.append(data)
 
             payload = bytes([OPC_WR, addr_hi, addr_lo]) + data
@@ -128,10 +153,11 @@ def main():
 
         start = 0
         row_idx = 0
-        for i in range(0, PIXELS//2, WIDTH//2):
-            addr = i + start
-            addr_hi = (addr >> 8) & 0xFF
-            addr_lo = addr & 0xFF
+        for row in range (HEIGHT):
+            byte_offset = row * WIDTH
+            sram_addr = start + (byte_offset//2)
+            addr_hi = (sram_addr >> 8) & 0xFF
+            addr_lo = sram_addr & 0xFF
 
             payload = bytes([OPC_RD, addr_hi, addr_lo]) + bytes([0x00] * WIDTH)
             send_frame(ser, payload)
@@ -141,9 +167,9 @@ def main():
             exp = written_rows[row_idx]
 
             if got == exp:
-                print(f"READ row {row_idx} addr={addr}: PASS")
+                print(f"READ row {row_idx} addr={sram_addr}: PASS")
             else:
-                print(f"READ row {row_idx} addr={addr}: FAIL")
+                print(f"READ row {row_idx} addr={sram_addr}: FAIL")
                 # print(f"  expected: {exp.hex(' ')}")
                 # print(f"  got     : {got.hex(' ')}")
 
