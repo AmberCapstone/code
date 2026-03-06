@@ -2,7 +2,7 @@
 
 use defmt::{Debug2Format, info};
 use embassy_stm32::{
-    gpio::Output,
+    gpio::{Output, OutputOpenDrain},
     mode::Async,
     pac::Interrupt::PVD_PVM,
     spi::{Spi, mode::Master},
@@ -78,11 +78,11 @@ const fn header(command: Command, addr: u32) -> [u8; 4] {
 
 pub struct SpiFlash<'a> {
     spi: Spi<'a, Async, Master>,
-    cs_n: Output<'a>,
+    cs_n: OutputOpenDrain<'a>,
 }
 
 impl<'a> SpiFlash<'a> {
-    pub async fn init(spi: Spi<'a, Async, Master>, cs_n: Output<'a>) -> Self {
+    pub async fn init(spi: Spi<'a, Async, Master>, cs_n: OutputOpenDrain<'a>) -> Self {
         let mut s = Self { spi, cs_n };
 
         let id = s.read_id().await;
