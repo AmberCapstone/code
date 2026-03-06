@@ -1,12 +1,17 @@
 #![no_std]
 #![no_main]
 
-use defmt::*;
+use crate::resources::*;
 use embassy_executor::Spawner;
-use embassy_stm32::gpio::{self};
-use embassy_stm32::spi;
-use embassy_time::Timer;
+use embassy_stm32::Config;
 use {defmt_rtt as _, panic_probe as _};
+
+mod debug_led;
+mod flash;
+mod rcc;
+mod resources;
+mod serial;
+mod state_machine;
 
 mod proto {
     #![allow(clippy::all)]
@@ -15,37 +20,16 @@ mod proto {
 }
 
 #[embassy_executor::main]
-async fn main(_spawner: Spawner) {
-    let p = embassy_stm32::init(Default::default());
+async fn main(spawner: Spawner) {
+    let mut config = Config::default();
+    rcc::configure(&mut config.rcc);
 
-    let mut led = gpio::Flex::new(p.PA5);
+    let p = embassy_stm32::init(config);
 
-    led.set_as_analog();
+    let r = split_resources!(p);
 
-    let mut mosi = p.PC12;
-    let mut miso = p.PC11;
-    let mut sck = p.PC10;
-
-    let flash_spi = spi::Spi::new_blocking(
-        p.SPI3,
-        sck.reborrow(),
-        mosi.reborrow(),
-        miso.reborrow(),
-        spi::Config::default(),
-    );
-    drop(flash_spi);
-
-    let mut mosi = gpio::Flex::new(mosi);
-    mosi.set_as_analog();
-    mosi.set_high();
-
-    loop {
-        info!("high");
-        led.set_high();
-        Timer::after_millis(700).await;
-
-        info!("low");
-        led.set_low();
-        Timer::after_millis(300).await;
-    }
+    spawner.spawn(state_machine::task()).unwrap();
+    spawner.spawn(flash::task(r.flash)).unwrap();
+    spawner.spawn(debug_led::led_task(r.leds)).unwrap();
+    spawner.spawn(serial::serial_task(r.usb)).unwrap();
 }
