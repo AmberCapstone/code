@@ -137,23 +137,19 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
     }
 
     async fn enable_writing(&mut self) -> Result<(), Error> {
-        self.send_command(Command::WriteEnable).await?;
-        Ok(())
+        self.send_command(Command::WriteEnable).await
     }
 
     async fn disable_writing(&mut self) -> Result<(), Error> {
-        self.send_command(Command::WriteDisable).await?;
-        Ok(())
+        self.send_command(Command::WriteDisable).await
     }
 
     pub async fn power_down(&mut self) -> Result<(), Error> {
-        self.send_command(Command::DeepPowerDown).await?;
-        Ok(())
+        self.send_command(Command::DeepPowerDown).await
     }
 
     pub async fn wake_up(&mut self) -> Result<(), Error> {
-        self.send_command(Command::ReleaseDeepPowerDown).await?;
-        Ok(())
+        self.send_command(Command::ReleaseDeepPowerDown).await
     }
 
     pub async fn page_program(&mut self, addr: u32, data: &[u8]) -> Result<(), Error> {
@@ -167,9 +163,7 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
             self.spi.write(data).await?;
         }
 
-        self.wait_for_idle().await?;
-
-        Ok(())
+        self.wait_for_idle().await
     }
 
     pub async fn page_write(&mut self, addr: u32, data: &[u8]) -> Result<(), Error> {
@@ -183,9 +177,7 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
             self.spi.write(data).await?;
         }
 
-        self.wait_for_idle().await?;
-
-        Ok(())
+        self.wait_for_idle().await
     }
 
     pub async fn read_data(&mut self, addr: u32, out: &mut [u8]) -> Result<(), Error> {
@@ -208,33 +200,25 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
     pub async fn page_erase(&mut self, addr: u32) -> Result<(), Error> {
         self.enable_writing().await?;
         self.send_header(Command::PageErase, addr).await?;
-        self.wait_for_idle().await?;
-
-        Ok(())
+        self.wait_for_idle().await
     }
 
     pub async fn subsector_erase(&mut self, addr: u32) -> Result<(), Error> {
         self.enable_writing().await?;
         self.send_header(Command::SubsectorErase, addr).await?;
-        self.wait_for_idle().await?;
-
-        Ok(())
+        self.wait_for_idle().await
     }
 
     pub async fn sector_erase(&mut self, addr: u32) -> Result<(), Error> {
         self.enable_writing().await?;
         self.send_header(Command::SectorErase, addr).await?;
-        self.wait_for_idle().await?;
-
-        Ok(())
+        self.wait_for_idle().await
     }
 
     pub async fn chip_erase(&mut self) -> Result<(), Error> {
         self.enable_writing().await?;
         self.send_command(Command::ChipErase).await?;
-        self.wait_for_idle().await?;
-
-        Ok(())
+        self.wait_for_idle().await
     }
 
     pub async fn read_id(&mut self) -> Result<Id, Error> {
