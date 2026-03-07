@@ -55,7 +55,7 @@ void PowerDown(SpiMaster& spi) {
 
 void WakeUp(SpiMaster& spi) {
     spi.SetChipSelect(false);
-    SendCommand(spi, Command::DEEP_POWER_DOWN);
+    SendCommand(spi, Command::RELEASE_DEEP_POWER_DOWN);
     spi.SetChipSelect(true);
 }
 

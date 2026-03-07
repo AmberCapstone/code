@@ -1,0 +1,63 @@
+[package]
+name = "sensor-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+assign-resources = "0.5.0"
+cobs = { version = "0.5.1", default-features = false, features = ["defmt"] }
+cortex-m = { version = "0.7.7", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.7.5"
+defmt = "1.0.1"
+defmt-rtt = "1.1.0"
+embassy-executor = { version = "0.9.1", features = [
+  "defmt",
+  "arch-cortex-m",
+  "executor-thread",
+] }
+embassy-futures = "0.1.2"
+embassy-stm32 = { version = "0.5.0", features = [
+  "chrono",
+  "defmt",
+  "exti",
+  "memory-x",
+  "stm32u083rc",
+  "time-driver-any",
+  "unstable-pac",
+] }
+embassy-sync = "0.7.2"
+embassy-time = { version = "0.5.0", features = [
+  "defmt",
+  "defmt-timestamp-uptime",
+  "tick-hz-32_768",
+] }
+embassy-usb = { version = "0.5.1", default-features = false }
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+heapless = "0.9.2"
+micropb = { version = "0.6.0", features = ["container-heapless-0-9"] }
+panic-probe = "1.0.0"
+
+[lints.clippy]
+pedantic = "warn"
+
+[features]
+pcb = []
+
+[profile.release]
+debug = 2
+
+[package.metadata.embassy]
+build = [
+  { target = "thumbv6m-none-eabi", artifact-dir = "out/examples/stm32u0" },
+]
+
+[[bin]]
+name = "sensor-rs"
+path = "src/main.rs"
+test = false
+doctest = false
+bench = false
+
+[build-dependencies]
+micropb-gen = "0.6.0"

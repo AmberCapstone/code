@@ -170,10 +170,10 @@ if __name__ == "__main__":
         command = Command(host_page_request=request_number)
         ser.write(pack(command))
 
-        page = status.flash_status.readout_page
-
-        if page is None:
+        if not status.flash_status.HasField("readout_page"):
             continue
+
+        page = status.flash_status.readout_page
 
         if page.page_number >= NUM_PAGES:
             continue

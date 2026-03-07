@@ -1,4 +1,4 @@
-edition = "2023";
+syntax = "proto3";
 
 package sensor;
 
@@ -19,29 +19,29 @@ enum State {
 }
 
 message Command {
-    Action action = 1;
-    flash.Page page = 2;
+    optional Action action = 1;
+    optional flash.Page page = 2;
 
-    uint32 host_page_request = 3; // only used in STATE_READOUT
+    optional uint32 host_page_request = 3; // only used in STATE_READOUT
 }
 
 
 message Status {
     // Diagnostics
-    uint32 tx_counter = 1;
-    uint32 rx_counter = 2;
-    int32 temperature_degc = 3;
-    int32 vbat_mv = 4;
-    int32 vrefint_mv = 5;
+    optional uint32 tx_counter = 1;
+    optional uint32 rx_counter = 2;
+    optional int32 temperature_degc = 3;
+    optional int32 vbat_mv = 4;
+    optional int32 vrefint_mv = 5;
 
-    State state = 6;
+    optional State state = 6;
 
     // Only used in STATE_FLASHING
-    flash.Status flash_status = 7;
+    optional flash.Status flash_status = 7;
 
-    uint32 micros = 8;
+    optional uint32 micros = 8;
 
     // sensors
-    uint32 supercap_mv = 10;
-    uint32 iload_ma = 11;
+    optional uint32 supercap_mv = 10;
+    optional uint32 iload_ma = 11;
 }
