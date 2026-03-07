@@ -9,7 +9,6 @@ use embassy_sync::{blocking_mutex::Mutex, blocking_mutex::raw::ThreadModeRawMute
 use embassy_time::{Duration, Ticker};
 
 static ACTION: Signal<ThreadModeRawMutex, Action> = Signal::new();
-
 static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(State::Idle));
 
 #[embassy_executor::task]
@@ -23,7 +22,7 @@ pub async fn task() {
         if let Some(new_state) = transition.take().or_else(|| {
             ACTION
                 .try_take()
-                .and_then(|action| action_transition(action, get_state()))
+                .and_then(|action| get_action_transition(action, get_state()))
         }) {
             info!("Transitioning into {:?}", Debug2Format(&new_state));
             STATE.lock(|s| s.set(new_state));
@@ -61,7 +60,7 @@ pub async fn task() {
 }
 
 pub fn get_state() -> State {
-    STATE.lock(|s| s.get())
+    STATE.lock(Cell::get)
 }
 
 pub fn handle_action(action: Action) {
@@ -69,7 +68,7 @@ pub fn handle_action(action: Action) {
     ACTION.signal(action);
 }
 
-fn action_transition(action: Action, state: State) -> Option<State> {
+fn get_action_transition(action: Action, state: State) -> Option<State> {
     match action {
         Action::None => None,
         Action::Reset => (state != State::Idle).then_some(State::Idle),

@@ -1,7 +1,9 @@
 #![no_std]
 #![no_main]
 
+#[allow(clippy::wildcard_imports)]
 use crate::resources::*;
+
 use embassy_executor::Spawner;
 use embassy_stm32::Config;
 use {defmt_rtt as _, panic_probe as _};
@@ -14,8 +16,7 @@ mod serial;
 mod state_machine;
 
 mod proto {
-    #![allow(clippy::all)]
-    #![allow(nonstandard_style, unused, irrefutable_let_patterns)]
+    #![allow(clippy::all, clippy::pedantic, nonstandard_style, unused, irrefutable_let_patterns)]
     include!(concat!(env!("OUT_DIR"), "/generated_proto.rs"));
 }
 

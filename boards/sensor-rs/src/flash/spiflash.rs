@@ -61,8 +61,9 @@ impl From<spi::Error> for Error {
     }
 }
 
-fn check_bounds(addr: u32, len: u32) -> Result<(), Error> {
-    if addr + len > size::CHIP {
+fn check_bounds(addr: u32, len: usize) -> Result<(), Error> {
+    #[allow(clippy::cast_possible_truncation, reason = "All lens are small")]
+    if addr + (len as u32) > size::CHIP {
         Err(Error::OutOfBounds)
     } else {
         Ok(())
@@ -85,7 +86,7 @@ impl<'a, P: OutputPin> CsGuard<'a, P> {
     }
 }
 
-impl<'a, P: OutputPin> Drop for CsGuard<'a, P> {
+impl<P: OutputPin> Drop for CsGuard<'_, P> {
     fn drop(&mut self) {
         self.0.set_high();
     }
@@ -122,7 +123,7 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
         self.read_status_register().await.map(|s| s.busy())
     }
 
-    pub async fn wait_for_idle(&mut self) -> Result<(), Error> {
+    async fn wait_for_idle(&mut self) -> Result<(), Error> {
         while self.is_busy().await? {
             Timer::after_millis(1).await;
         }
@@ -153,7 +154,7 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
     }
 
     pub async fn page_program(&mut self, addr: u32, data: &[u8]) -> Result<(), Error> {
-        check_bounds(addr, data.len() as u32)?;
+        check_bounds(addr, data.len())?;
 
         self.enable_writing().await?;
 
@@ -167,7 +168,7 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
     }
 
     pub async fn page_write(&mut self, addr: u32, data: &[u8]) -> Result<(), Error> {
-        check_bounds(addr, data.len() as u32)?;
+        check_bounds(addr, data.len())?;
 
         self.enable_writing().await?;
 
@@ -181,7 +182,7 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
     }
 
     pub async fn read_data(&mut self, addr: u32, out: &mut [u8]) -> Result<(), Error> {
-        check_bounds(addr, out.len() as u32)?;
+        check_bounds(addr, out.len())?;
 
         let cs = CsGuard::new(&mut self.cs_n);
         self.spi.write(&header(Command::ReadDataBytes, addr)).await?;
@@ -227,6 +228,6 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
         let cs = CsGuard::new(&mut self.cs_n);
         self.spi.transfer_in_place(&mut txrx).await?;
 
-        Ok(Id::from(&txrx[1..4].try_into().expect("This should not fail")))
+        Ok(Id::from(&[txrx[1], txrx[2], txrx[3]]))
     }
 }

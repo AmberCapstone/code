@@ -15,7 +15,7 @@ pub enum Sequence {
 }
 
 impl Sequence {
-    fn get_pattern(&self) -> Pattern {
+    fn get_pattern(self) -> Pattern {
         match self {
             Self::Normal => Pattern::from_array([Blink::from_millis(500, 500)]),
             Self::Error => Pattern::from_array([Blink::from_millis(125, 125), Blink::from_millis(125, 125 + 500)]),

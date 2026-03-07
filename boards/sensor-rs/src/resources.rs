@@ -1,3 +1,5 @@
+#![allow(clippy::struct_field_names, reason = "Names are clearer for the macro")]
+
 use assign_resources::assign_resources;
 use embassy_stm32::{Peri, bind_interrupts, exti, interrupt, peripherals, usb};
 

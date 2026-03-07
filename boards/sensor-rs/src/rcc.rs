@@ -1,4 +1,4 @@
-use embassy_stm32::rcc::*;
+use embassy_stm32::rcc::{Config, Hsi48Config, Pll, PllMul, PllPreDiv, PllRDiv, PllSource, Sysclk, mux};
 
 pub fn configure(rcc: &mut Config) {
     rcc.hsi = true;

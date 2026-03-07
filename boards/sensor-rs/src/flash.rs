@@ -1,25 +1,33 @@
-use core::cell::Cell;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::{
+    cell::Cell,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use defmt::{debug, error, info};
-use embassy_stm32::crc::{self, Crc};
-use embassy_stm32::gpio::{Level, Output, OutputOpenDrain, Speed};
-use embassy_stm32::spi::{self, Spi};
-use embassy_stm32::time::Hertz;
-use embassy_sync::blocking_mutex::Mutex;
-use embassy_sync::channel::Channel;
-use embassy_sync::watch::Watch;
-use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, signal::Signal};
+use embassy_stm32::{
+    crc::{self, Crc},
+    gpio::{Level, Output, OutputOpenDrain, Speed},
+    spi::{self, Spi},
+    time::Hertz,
+};
+use embassy_sync::{
+    blocking_mutex::{Mutex, raw::ThreadModeRawMutex},
+    channel::Channel,
+    signal::Signal,
+    watch::Watch,
+};
 use embassy_time::{Duration, TimeoutError, WithTimeout};
 use embedded_hal::digital::OutputPin;
 
-use crate::flash::spiflash::SpiFlash;
-use crate::proto::sensor_::flash_::{self, State};
-use crate::resources::Flash;
-
-use spiflash::size::PAGE as PAGE_SIZE;
+use crate::{
+    flash::spiflash::SpiFlash,
+    proto::sensor_::flash_::{self, State},
+    resources::Flash,
+};
 
 mod spiflash;
+
+use spiflash::size::PAGE as PAGE_SIZE;
 
 const PAGE_MAX_ATTEMPTS: u32 = 5;
 const ARQ_N: usize = 1;
@@ -70,7 +78,7 @@ pub async fn task(mut r: Flash) {
         crc::InputReverseConfig::Byte,
         true,
         crc::PolySize::Width32,
-        0xffffffff,
+        0xffff_ffff,
         0x04c1_1db7,
     )
     .unwrap();
@@ -144,13 +152,13 @@ async fn flash_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>
             let Some(num) = new_page.page_number() else { continue };
             if *num != pg_num {
                 continue;
-            };
+            }
             let Some(data) = new_page.data() else { continue };
             let Some(exp_crc) = new_page.crc() else { continue };
 
             if compute_crc(*num, data, crc) != *exp_crc {
                 continue;
-            };
+            }
 
             debug!("Programming page {}", pg_num);
             flash.page_program(pg_num * PAGE_SIZE, data).await?;
@@ -220,7 +228,7 @@ pub fn get_status() -> flash_::Status {
             }
         }
         _ => (),
-    };
+    }
 
     s
 }
@@ -234,7 +242,7 @@ pub fn set_readout_req_number(host_pg_req: u32) {
 }
 
 fn get_state() -> flash_::State {
-    STATE.lock(|s| s.get())
+    STATE.lock(Cell::get)
 }
 
 fn set_state(state: flash_::State) {

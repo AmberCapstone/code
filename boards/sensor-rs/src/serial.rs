@@ -4,13 +4,14 @@ use embassy_futures::join::join3;
 use embassy_stm32::usb::{Driver, Instance};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
 use embassy_time::Timer;
-use embassy_usb::Builder;
-use embassy_usb::class::cdc_acm::{self, CdcAcmClass, Receiver, Sender};
-use embassy_usb::driver::EndpointError;
+use embassy_usb::{
+    Builder,
+    class::cdc_acm::{self, CdcAcmClass, Receiver, Sender},
+    driver::EndpointError,
+};
 use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 
-use crate::{flash, resources};
-use crate::{proto, state_machine};
+use crate::{flash, proto, resources, state_machine};
 
 const PACKET_SIZE: u16 = 64;
 
