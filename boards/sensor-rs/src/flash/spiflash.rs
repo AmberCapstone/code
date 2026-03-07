@@ -17,7 +17,7 @@ mod id;
 
 use crate::flash::spiflash::{command::Command, id::Id};
 
-mod size {
+pub mod size {
     // All sizes in bytes
     pub const PAGE: u32 = 0x100;
     pub const SUBSECTOR: u32 = 0x1000;
@@ -48,7 +48,7 @@ const fn header(command: Command, addr: u32) -> [u8; 4] {
     h
 }
 
-#[derive(defmt::Format)]
+#[derive(Debug, defmt::Format)]
 pub enum Error {
     UnxpectedId,
     PeripheralFailure(spi::Error),
@@ -159,12 +159,15 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
     pub async fn page_program(&mut self, addr: u32, data: &[u8]) -> Result<(), Error> {
         check_bounds(addr, data.len() as u32)?;
 
-        self.wait_for_idle().await?;
         self.enable_writing().await?;
 
-        let cs = CsGuard::new(&mut self.cs_n);
-        self.spi.write(&header(Command::PageProgram, addr)).await?;
-        self.spi.write(data).await?;
+        {
+            let cs = CsGuard::new(&mut self.cs_n);
+            self.spi.write(&header(Command::PageProgram, addr)).await?;
+            self.spi.write(data).await?;
+        }
+
+        self.wait_for_idle().await?;
 
         Ok(())
     }
@@ -172,12 +175,15 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
     pub async fn page_write(&mut self, addr: u32, data: &[u8]) -> Result<(), Error> {
         check_bounds(addr, data.len() as u32)?;
 
-        self.wait_for_idle().await?;
         self.enable_writing().await?;
 
-        let cs = CsGuard::new(&mut self.cs_n);
-        self.spi.write(&header(Command::PageWrite, addr)).await?;
-        self.spi.write(data).await?;
+        {
+            let cs = CsGuard::new(&mut self.cs_n);
+            self.spi.write(&header(Command::PageWrite, addr)).await?;
+            self.spi.write(data).await?;
+        }
+
+        self.wait_for_idle().await?;
 
         Ok(())
     }
@@ -200,31 +206,35 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
     }
 
     pub async fn page_erase(&mut self, addr: u32) -> Result<(), Error> {
-        self.wait_for_idle().await?;
         self.enable_writing().await?;
+        self.send_header(Command::PageErase, addr).await?;
+        self.wait_for_idle().await?;
 
-        self.send_header(Command::PageErase, addr).await
+        Ok(())
     }
 
     pub async fn subsector_erase(&mut self, addr: u32) -> Result<(), Error> {
-        self.wait_for_idle().await?;
         self.enable_writing().await?;
+        self.send_header(Command::SubsectorErase, addr).await?;
+        self.wait_for_idle().await?;
 
-        self.send_header(Command::SubsectorErase, addr).await
+        Ok(())
     }
 
     pub async fn sector_erase(&mut self, addr: u32) -> Result<(), Error> {
-        self.wait_for_idle().await?;
         self.enable_writing().await?;
+        self.send_header(Command::SectorErase, addr).await?;
+        self.wait_for_idle().await?;
 
-        self.send_header(Command::SectorErase, addr).await
+        Ok(())
     }
 
     pub async fn chip_erase(&mut self) -> Result<(), Error> {
-        self.wait_for_idle().await?;
         self.enable_writing().await?;
+        self.send_command(Command::ChipErase).await?;
+        self.wait_for_idle().await?;
 
-        self.send_command(Command::ChipErase).await
+        Ok(())
     }
 
     pub async fn read_id(&mut self) -> Result<Id, Error> {

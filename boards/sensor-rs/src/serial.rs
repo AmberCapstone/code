@@ -1,5 +1,5 @@
 use cobs::CobsDecoder;
-use defmt::{debug, error, info};
+use defmt::{debug, info, warn};
 use embassy_futures::join::join3;
 use embassy_stm32::usb::{Driver, Instance};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
@@ -9,7 +9,7 @@ use embassy_usb::class::cdc_acm::{self, CdcAcmClass, Receiver, Sender};
 use embassy_usb::driver::EndpointError;
 use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 
-use crate::resources;
+use crate::{flash, resources};
 use crate::{proto, state_machine};
 
 const PACKET_SIZE: u16 = 64;
@@ -86,9 +86,7 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
             .init_rx_counter(state.rx_counter)
             .init_tx_counter(state.tx_counter)
             .init_state(state_machine::get_state())
-            .init_flash_status(
-                proto::sensor_::flash_::Status::default().init_state(proto::sensor_::flash_::State::Idle),
-            );
+            .init_flash_status(flash::get_status());
 
         // Encode with protobuf then COBS
         let mut encoder = PbEncoder::new(heapless::Vec::<u8, MAX_SIZE>::new());
@@ -107,7 +105,7 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
         debug!("Sent {}", state.tx_counter);
         STATE.lock().await.tx_counter += 1;
 
-        Timer::after_millis(100).await;
+        Timer::after_millis(10).await;
     }
 }
 
@@ -130,20 +128,28 @@ async fn receive_loop<'d, T: Instance + 'd>(receiver: &mut Receiver<'d, Driver<'
                 let mut pb_dec = PbDecoder::new(&decoder.dest()[..n.frame_size()]);
                 let mut command = proto::sensor_::Command::default();
                 if command.decode(&mut pb_dec, n.frame_size()).is_ok() {
-                    process_command(&command).await;
+                    process_command(command).await;
                 }
             }
             Ok(None) => debug!("I'M HUNGRY"),
-            Err(_) => error!("Bad COBS"),
+            Err(_) => warn!("Invalid COBS"),
         }
     }
 }
 
-async fn process_command(command: &proto::sensor_::Command) {
+async fn process_command(mut command: proto::sensor_::Command) {
     STATE.lock().await.rx_counter += 1;
 
-    if let Some(action) = command.action() {
-        state_machine::handle_action(*action);
+    if let Some(action) = command.take_action() {
+        state_machine::handle_action(action);
+    }
+
+    if let Some(page) = command.take_page() {
+        flash::accept_page(page);
+    }
+
+    if let Some(host_pg_req) = command.take_host_page_request() {
+        flash::set_readout_req_number(host_pg_req);
     }
 }
 

@@ -37,18 +37,18 @@ pub async fn task() {
                     flash::start();
                 }
 
-                // if flash::IsDone() {
-                transition = Some(State::Idle);
-                // }
+                if flash::is_done() {
+                    transition = Some(State::Idle);
+                }
             }
             State::Readout => {
                 if on_enter {
                     flash::start_readout();
                 }
 
-                // if flash::IsDone() {
-                transition = Some(State::Idle);
-                // }
+                if flash::is_done() {
+                    transition = Some(State::Idle);
+                }
             }
             _ => {
                 error!("Unknown state");
