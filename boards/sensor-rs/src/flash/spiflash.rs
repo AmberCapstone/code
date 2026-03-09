@@ -2,7 +2,7 @@
 
 use core::result;
 
-use defmt::{Debug2Format, error, info};
+use defmt::{Debug2Format, debug, error, info};
 use embassy_stm32::{
     gpio::{Output, OutputOpenDrain},
     mode::Async,
@@ -99,7 +99,7 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
         s.send_command(Command::ReleaseDeepPowerDown).await?;
 
         let id = s.read_id().await?;
-        info!("SPI Flash ID {:?}", Debug2Format(&id));
+        debug!("SPI Flash ID {:?}", Debug2Format(&id));
 
         if id == Id::expected() {
             info!("Connected to SPI Flash");

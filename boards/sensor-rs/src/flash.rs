@@ -4,6 +4,7 @@ use core::{
 };
 
 use defmt::{debug, error, info};
+use embassy_futures::select::select;
 use embassy_stm32::{
     crc::{self, Crc},
     gpio::{Level, Output, OutputOpenDrain, Speed},
@@ -58,6 +59,8 @@ impl From<TimeoutError> for Error {
 }
 
 static TRIGGER: Signal<ThreadModeRawMutex, Trigger> = Signal::new();
+static RESET: Signal<ThreadModeRawMutex, ()> = Signal::new();
+static DONE: Signal<ThreadModeRawMutex, ()> = Signal::new(); // remove once FSM isn't so bossy
 static STATE: Mutex<ThreadModeRawMutex, Cell<flash_::State>> = Mutex::new(Cell::new(flash_::State::Idle));
 
 static RN: AtomicU32 = AtomicU32::new(0);
@@ -85,7 +88,11 @@ pub async fn task(mut r: Flash) {
     let mut crc = Crc::new(r.crc, crc_config);
 
     loop {
+        TRIGGER.reset();
+        set_state(State::Idle);
+
         let trigger = TRIGGER.wait().await;
+        RESET.reset();
 
         // Activate SPI
         let mut _reset_n = Output::new(r.reset_n.reborrow(), Level::High, Speed::Low);
@@ -109,19 +116,25 @@ pub async fn task(mut r: Flash) {
             continue;
         };
 
-        match trigger {
-            Trigger::Flash => match flash_file(&mut flash, &mut crc).await {
+        select(trigger.handle(&mut flash, &mut crc), RESET.wait()).await;
+
+        // Deactivate SPI
+        drop(flash); // dropping SPI calls set_as_disconnected() on all pins
+    }
+}
+
+impl Trigger {
+    async fn handle<P: OutputPin>(&self, flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>) {
+        match self {
+            Trigger::Flash => match flash_file(flash, crc).await {
                 Ok(()) => info!("Wrote file to flash!"),
                 Err(e) => error!("Failed to flash the file {:?}", e),
             },
-            Trigger::Readout => match readout_file(&mut flash, &mut crc).await {
+            Trigger::Readout => match readout_file(flash, crc).await {
                 Ok(()) => info!("Readout complete!"),
                 Err(e) => error!("Readout failed {:?}", e),
             },
         }
-
-        // Deactivate SPI
-        drop(flash); // dropping SPI calls set_as_disconnected() on all pins
     }
 }
 
@@ -166,7 +179,7 @@ async fn flash_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>
         }
     }
 
-    set_state(State::Done);
+    DONE.signal(());
     Ok(())
 }
 
@@ -175,6 +188,7 @@ async fn readout_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'
     info!("Starting readout");
 
     let mut last_page_loaded: Option<u32> = None;
+    READOUT_RN.reset();
 
     loop {
         let req_num = READOUT_RN.wait().await;
@@ -202,7 +216,7 @@ async fn readout_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'
 
     READOUT_PAGE.sender().clear();
 
-    set_state(State::Done);
+    DONE.signal(());
     Ok(())
 }
 
@@ -250,13 +264,19 @@ fn set_state(state: flash_::State) {
 }
 
 pub fn start() {
+    DONE.reset();
     TRIGGER.signal(Trigger::Flash);
 }
 
 pub fn start_readout() {
+    DONE.reset();
     TRIGGER.signal(Trigger::Readout);
 }
 
+pub fn reset() {
+    RESET.signal(());
+}
+
 pub fn is_done() -> bool {
-    get_state() == flash_::State::Done
+    DONE.try_take().is_some()
 }

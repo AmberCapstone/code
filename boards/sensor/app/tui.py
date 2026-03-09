@@ -1,8 +1,8 @@
 import binascii
 import subprocess
+import threading
 import time
 from pathlib import Path
-import threading
 
 import cobs
 import serial
@@ -18,7 +18,7 @@ from textual_fspicker import FileOpen
 if subprocess.call(["sh", "generate_proto.sh"]) != 0:
     exit(1)
 
-import flash_pb2 as flash
+import sensor.flash_pb2 as flash
 from sensor_pb2 import Action, Command, State, Status
 
 PAGE_SIZE = 256
@@ -149,8 +149,8 @@ class TUI(App):
         else:
             self.send(command)
 
-        text += f"\n READ  {self.last_read_interval*1000:8.2f} ms"
-        text += f"\n WRITE {self.last_write_interval*1000:8.2f} ms"
+        text += f"\n READ  {self.last_read_interval * 1000:8.2f} ms"
+        text += f"\n WRITE {self.last_write_interval * 1000:8.2f} ms"
         label.update(text)
 
     def send(self, command: Command) -> None:
