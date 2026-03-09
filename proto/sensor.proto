@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package sensor;
 
-import "flash.proto";
+import "sensor/flash.proto";
 
 enum Action {
     ACTION_NONE = 0;

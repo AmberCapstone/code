@@ -1,5 +1,5 @@
 use cobs::CobsDecoder;
-use defmt::{debug, info, warn};
+use defmt::{info, trace, warn};
 use embassy_futures::join::join3;
 use embassy_stm32::usb::{Driver, Instance};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
@@ -103,7 +103,7 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
         }
         sender.write_packet(&[]).await?; // send zero length packet to ensure host processes the last chunk
 
-        debug!("Sent {}", state.tx_counter);
+        trace!("Sent tx_counter={}", state.tx_counter);
         STATE.lock().await.tx_counter += 1;
 
         Timer::after_millis(10).await;
@@ -132,7 +132,7 @@ async fn receive_loop<'d, T: Instance + 'd>(receiver: &mut Receiver<'d, Driver<'
                     process_command(command).await;
                 }
             }
-            Ok(None) => debug!("I'M HUNGRY"),
+            Ok(None) => (),
             Err(_) => warn!("Invalid COBS"),
         }
     }

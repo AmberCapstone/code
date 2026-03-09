@@ -30,7 +30,11 @@ pub async fn task() {
         }
 
         match get_state() {
-            State::Idle => (),
+            State::Idle => {
+                if on_enter {
+                    flash::reset();
+                }
+            }
             State::Flashing => {
                 if on_enter {
                     flash::start();

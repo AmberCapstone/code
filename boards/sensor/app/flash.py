@@ -12,7 +12,7 @@ from tqdm import tqdm
 if subprocess.call(["sh", "generate_proto.sh"]) != 0:
     exit(1)
 
-import flash_pb2 as flash
+import sensor.flash_pb2 as flash
 from sensor_pb2 import Action, Command, State, Status
 
 PAGE_SIZE = 256

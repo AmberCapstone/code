@@ -1,7 +1,7 @@
 use std::{io::Result, path::Path};
 
 fn generate_proto() -> Result<()> {
-    let path = Path::new("proto/sensor");
+    let path = Path::new("proto");
 
     let mut g = micropb_gen::Generator::new();
     g.use_container_heapless()
@@ -9,11 +9,11 @@ fn generate_proto() -> Result<()> {
         .add_protoc_arg(format!("-I{}", path.display()));
 
     // generator doesn't follow -I argument path for config files
-    g.parse_config_file(&path.join("flash.toml"), "sensor.flash")
+    g.parse_config_file(&path.join("sensor/flash.toml"), "sensor.flash")
         .map_err(std::io::Error::other)?;
 
     g.compile_protos(
-        &["sensor.proto", "flash.proto"],
+        &["sensor.proto", "sensor/flash.proto"],
         std::env::var("OUT_DIR").unwrap() + "/generated_proto.rs",
     )
     .expect("micropb failed");
