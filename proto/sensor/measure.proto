@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package sensor;
+
+message Measurement {
+    int32 temperature_degc = 1;
+    int32 vbat_mv = 2;
+    int32 vrefint_mv = 3;
+    int32 isense_ua = 4;
+    int32 fpga_isense_ua = 5;
+    int32 supercapacitor_mv = 6;
+}
+

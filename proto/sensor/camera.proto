@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package sensor.camera;
+
+enum State {
+    STATE_UNKNOWN = 0;
+    STATE_OFF = 1;
+    STATE_BOOTING = 2;
+    STATE_CONFIGURING = 3;
+    STATE_RUNNING = 4;
+}
+

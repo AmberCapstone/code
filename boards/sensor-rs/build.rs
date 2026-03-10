@@ -8,15 +8,27 @@ fn generate_proto() -> Result<()> {
         .single_oneof_msg_as_enum(true)
         .add_protoc_arg(format!("-I{}", path.display()));
 
-    // generator doesn't follow -I argument path for config files
-    g.parse_config_file(&path.join("sensor/flash.toml"), "sensor.flash")
-        .map_err(std::io::Error::other)?;
+    let protos = [
+        "sensor.proto",
+        "sensor/alerts.proto",
+        "sensor/camera.proto",
+        "sensor/flash.proto",
+        "sensor/measure.proto",
+        "sensor/parameters.proto",
+    ];
 
-    g.compile_protos(
-        &["sensor.proto", "sensor/flash.proto"],
-        std::env::var("OUT_DIR").unwrap() + "/generated_proto.rs",
-    )
-    .expect("micropb failed");
+    // Check for config files
+    for proto in protos.map(Path::new) {
+        let config = path.join(proto.with_extension("toml"));
+        if std::fs::exists(&config)? {
+            // Assumes "x/y.[proto,toml]" is package "x.y"
+            let package = proto.with_extension("").to_str().unwrap().replace('/', ".");
+            g.parse_config_file(&config, &package).map_err(std::io::Error::other)?;
+        }
+    }
+
+    g.compile_protos(&protos, std::env::var("OUT_DIR").unwrap() + "/generated_proto.rs")
+        .expect("micropb failed");
 
     println!("cargo:rerun-if-changed=proto");
     Ok(())
