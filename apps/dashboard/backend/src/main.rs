@@ -5,9 +5,13 @@ use axum::{
     routing::get,
 };
 
+use reqwest::Client;
 use serde::Serialize;
-use std::{net::SocketAddr, time::Instant};
-use tokio::time::{Duration, sleep};
+use std::{
+    net::SocketAddr,
+    time::{Instant, UNIX_EPOCH},
+};
+use tokio::time::{Duration, interval, sleep};
 use tower_http::trace::TraceLayer;
 use tracing::debug;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -19,6 +23,17 @@ struct SensorData {
     power: Power,
 }
 
+impl SensorData {
+    fn to_line(&self) -> String {
+        format!(
+            "mock battery={},state=\"{:?}\",{}",
+            self.battery,
+            self.state,
+            self.power.to_line()
+        )
+    }
+}
+
 #[derive(Serialize, Debug)]
 struct Power {
     solar: f32,
@@ -28,25 +43,16 @@ struct Power {
     antenna: f32,
 }
 
-// #[derive(Serialize, Debug)]
-// enum Heading {
-//     Up,
-//     Down,
-//     Left,
-//     Right,
-// }
-
-// #[derive(Serialize, Debug)]
-// struct Boat {
-//     heading: Heading,
-// }
-
-// #[derive(Serialize, Debug)]
-// struct Boat {}
-
 impl Power {
     fn net(&self) -> f32 {
         self.solar - (self.fpga + self.camera + self.mcu + self.antenna)
+    }
+
+    fn to_line(&self) -> String {
+        format!(
+            "solar={},fpga={},camera={},mcu={},antenna={}",
+            self.solar, self.fpga, self.camera, self.mcu, self.antenna
+        )
     }
 }
 
@@ -108,8 +114,13 @@ async fn handle_socket(mut socket: WebSocket) {
 
     let mut started = Instant::now();
 
+    let mut ticker = interval(PERIOD);
+
     loop {
         use State::*;
+
+        ticker.tick().await;
+
         match state {
             Charging => {
                 if battery > 0.99 {
@@ -146,8 +157,33 @@ async fn handle_socket(mut socket: WebSocket) {
         if socket.send(Message::text(msg)).await.is_err() {
             break;
         }
+        write_to_db(&data).await;
+    }
+}
 
-        sleep(PERIOD).await;
+async fn write_to_db(data: &SensorData) {
+    let client = Client::new();
+    let token = std::env::var("INFLUX_TOKEN").unwrap();
+
+    let line_prot = data.to_line();
+    tracing::info!("{line_prot}");
+
+    let org = "amber";
+    let bucket = "capstone";
+    let response = client
+        .post(format!(
+            "http://localhost:8086/api/v2/write?org={org}&bucket={bucket}&precision=ns"
+        ))
+        .header("Content-Type", "text/plain; charset=utf-8")
+        .header("Accept", "application/json")
+        .header("Authorization", format!("Token {token}"))
+        .body(data.to_line())
+        .send()
+        .await;
+
+    match response {
+        Ok(r) => tracing::debug!("Wrote to DB (resp={r:?})"),
+        Err(e) => tracing::error!(err = ?e, "Failed to write to DB"),
     }
 }
 
