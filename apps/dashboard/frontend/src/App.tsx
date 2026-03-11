@@ -1,12 +1,25 @@
-import { useEffect, useState } from 'react'
-import { connectSensors, SensorData } from "./sensor"
-import { motion } from "framer-motion"
+import { useEffect, useState } from "react"
+import type { SensorData } from "./sensors"
+import { connectSensors } from "./sensors"
+import System from "./components/system"
+import MPA from "./components/mpa"
+import React from "react"
+import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { Button, Container } from "reactstrap"
 
-// import './App.css'
+import "./App.css"
 
 export default function App() {
   const [sensors, setSensors] = useState<SensorData>({
     battery: 0,
+    state: "",
+    power: {
+      solar: 0,
+      fpga: 0,
+      camera: 0,
+      mcu: 0,
+      antenna: 0
+    }
   })
 
   useEffect(() => {
@@ -14,21 +27,22 @@ export default function App() {
     return () => ws.close()
   }, [])
 
+
   return (
-    <div style={{ padding: 40, fontFamily: "sans-serif" }}>
-      <h1>Sensor Dashboard</h1>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<System measure={sensors} />} />
+        <Route path="/mpa" element={<MPA />} />
+      </Routes>
+    </BrowserRouter>
+    // <div className="app flew-row align-items-center">
+    //   <Container></Container>
+    //   <Button className="btn" onClick={routeMPA} />
+    //   <h1>{sensors.state}</h1>
 
-      <h2>Battery</h2>
-      {/* <div style={{ width: 300, height: 30, border: "1px solid black" }}>
-        <motion.div
-          style={{ height: "100%", background: "limegreen" }}
-          animate={{ width: `${sensors.battery * 100}%` }}
-          transition={{ duration: 0.3 }}
-        />
-      </div> */}
-
-      {/* <p>{{ sensors.battery * 100 }}.toFixed(1)%</p> */}
-    </div>
+    //   <br />
+    //   <System measure={sensors} />
+    // </div>
   )
-}
 
+}

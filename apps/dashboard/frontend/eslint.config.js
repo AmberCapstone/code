@@ -34,9 +34,9 @@ export default defineConfig([
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": "warn",
-      "react-perf/jsx-no-new-object-as-prop": "warn",
-      "react-perf/jsx-no-new-function-as-prop": "warn",
-      "react-perf/jsx-no-new-array-as-prop": "warn",
+      // "react-perf/jsx-no-new-object-as-prop": "warn",
+      // "react-perf/jsx-no-new-function-as-prop": "warn",
+      // "react-perf/jsx-no-new-array-as-prop": "warn",
     }
   },
 ])
