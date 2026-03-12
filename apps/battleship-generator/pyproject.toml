@@ -1,0 +1,9 @@
+[project]
+name = "battleship-generator"
+version = "0.1.0"
+description = "Generate synthetic battleship-style training images and labels"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "pillow>=11.0.0",
+]
