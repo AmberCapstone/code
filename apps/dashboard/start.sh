@@ -2,7 +2,7 @@
 
 # processes to run in each pane
 INFLUX="influxd --reporting-disabled"
-BACKEND="source .env; cargo run -p backend"
+BACKEND="source .env; cargo run -p backend" # .env should set INFLUX_TOKEN
 FRONTEND="npm --prefix frontend run dev"
 FIREFOX="sleep 1;firefox http://localhost:3002 http://localhost:5173"
 
