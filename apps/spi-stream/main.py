@@ -131,25 +131,25 @@ def main():
         save_qvga_y_bytes_as_image(image_bytes, "input_qvga_y_preview.png")
         written_rows: list[bytes] = []
 
-        start = 0
-        for row in range(HEIGHT):
-            byte_offset = row * WIDTH
-            sram_addr = start + (byte_offset//2)
-            addr_hi = (sram_addr >> 8) & 0xFF
-            addr_lo = sram_addr & 0xFF
+        # start = 0
+        # for row in range(HEIGHT):
+        #     byte_offset = row * WIDTH
+        #     sram_addr = start + (byte_offset//2)
+        #     addr_hi = (sram_addr >> 8) & 0xFF
+        #     addr_lo = sram_addr & 0xFF
 
-            # data = random.randbytes(WIDTH)
-            data = image_bytes[byte_offset : byte_offset + WIDTH]
-            written_rows.append(data)
+        #     # data = random.randbytes(WIDTH)
+        #     data = image_bytes[byte_offset : byte_offset + WIDTH]
+        #     written_rows.append(data)
 
-            payload = bytes([OPC_WR, addr_hi, addr_lo]) + data
-            send_frame(ser, payload)
-            resp = read_frame(ser)
+        #     payload = bytes([OPC_WR, addr_hi, addr_lo]) + data
+        #     send_frame(ser, payload)
+        #     resp = read_frame(ser)
 
-            # print("addr = ", addr, "resp = ", resp.hex(" ") if resp else "<timeout>")
-            # framebuf.extend(resp[3 : 3 + WIDTH])
+        #     # print("addr = ", addr, "resp = ", resp.hex(" ") if resp else "<timeout>")
+        #     # framebuf.extend(resp[3 : 3 + WIDTH])
 
-            time.sleep(0.2)
+        #     time.sleep(0.2)
 
         start = 0
         row_idx = 0
@@ -163,17 +163,17 @@ def main():
             send_frame(ser, payload)
             resp = read_frame(ser)
 
-            got = resp[3 : 3 + WIDTH]
-            exp = written_rows[row_idx]
+            # got = resp[3 : 3 + WIDTH]
+            # exp = written_rows[row_idx]
 
-            if got == exp:
-                print(f"READ row {row_idx} addr={sram_addr}: PASS")
-            else:
-                print(f"READ row {row_idx} addr={sram_addr}: FAIL")
-                # print(f"  expected: {exp.hex(' ')}")
-                # print(f"  got     : {got.hex(' ')}")
+            # if got == exp:
+            #     print(f"READ row {row_idx} addr={sram_addr}: PASS")
+            # else:
+            #     print(f"READ row {row_idx} addr={sram_addr}: FAIL")
+            #     # print(f"  expected: {exp.hex(' ')}")
+            #     # print(f"  got     : {got.hex(' ')}")
 
-            # print("addr = ", addr, "resp = ", resp.hex(" ") if resp else "<timeout>")
+            # # print("addr = ", addr, "resp = ", resp.hex(" ") if resp else "<timeout>")
             framebuf.extend(resp[3 : 3 + WIDTH])
 
             time.sleep(0.2)
