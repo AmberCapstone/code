@@ -2,7 +2,7 @@
 
 # processes to run in each pane
 INFLUX="influxd --reporting-disabled"
-BACKEND="source .env; cargo run -p backend" # .env should set INFLUX_TOKEN
+BACKEND="source .env; RUST_BACKTRACE=1 cargo run -p backend" # .env should set INFLUX_TOKEN
 FRONTEND="npm --prefix frontend run dev"
 FIREFOX="sleep 1;firefox http://localhost:3002 http://localhost:5173"
 
@@ -28,3 +28,4 @@ tmux send-keys -t "$SESSION:main.4" "$FIREFOX" Enter
 
 tmux select-pane -t "$SESSION:main.3"
 tmux attach-session -t "$SESSION"
+
