@@ -1,37 +1,30 @@
 use axum::{
     Router,
-    extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    extract::{
+        State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
     response::IntoResponse,
     routing::get,
 };
-
-use reqwest::Client;
+use influx::policy::{LogPolicy, PolicyRouter};
 use serde::Serialize;
 use std::{
     net::SocketAddr,
-    time::{Instant, UNIX_EPOCH},
+    time::{Instant, SystemTime},
 };
-use tokio::time::{Duration, interval, sleep};
+use tokio::{
+    sync::mpsc,
+    time::{Duration, interval},
+};
 use tower_http::trace::TraceLayer;
-use tracing::debug;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Serialize, Debug)]
 struct SensorData {
     battery: f32,
-    state: State,
+    state: FwState,
     power: Power,
-}
-
-impl SensorData {
-    fn to_line(&self) -> String {
-        format!(
-            "mock battery={},state=\"{:?}\",{}",
-            self.battery,
-            self.state,
-            self.power.to_line()
-        )
-    }
 }
 
 #[derive(Serialize, Debug)]
@@ -47,32 +40,26 @@ impl Power {
     fn net(&self) -> f32 {
         self.solar - (self.fpga + self.camera + self.mcu + self.antenna)
     }
-
-    fn to_line(&self) -> String {
-        format!(
-            "solar={},fpga={},camera={},mcu={},antenna={}",
-            self.solar, self.fpga, self.camera, self.mcu, self.antenna
-        )
-    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Copy, Clone)]
-enum State {
+enum FwState {
     Charging,
     Capture,
     Process,
     Transmit,
 }
 
-impl State {
+impl FwState {
+    #[allow(clippy::unused_self)]
     fn solar(self) -> f32 {
         9.0
     }
 
     fn fpga(self) -> f32 {
         match self {
-            State::Capture => 5.0,
-            State::Process => 15.0,
+            FwState::Capture => 5.0,
+            FwState::Process => 15.0,
             _ => 0.0,
         }
     }
@@ -100,90 +87,81 @@ impl State {
     }
 }
 
-async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
-    ws.on_upgrade(handle_socket)
+#[derive(Clone)]
+struct AppState {
+    tx: mpsc::Sender<(SensorData, SystemTime)>,
 }
 
-async fn handle_socket(mut socket: WebSocket) {
+async fn ws_handler(ws: WebSocketUpgrade, State(app_state): State<AppState>) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_socket(socket, app_state))
+}
+
+async fn handle_socket(mut socket: WebSocket, app_state: AppState) {
     const PERIOD: Duration = Duration::from_millis(50);
 
     tracing::info!("Client socket connected");
 
     let mut battery: f32 = 0.5;
-    let mut state = State::Charging;
+    let mut fw_state = FwState::Charging;
 
     let mut started = Instant::now();
 
     let mut ticker = interval(PERIOD);
 
     loop {
-        use State::*;
+        #[allow(clippy::enum_glob_use)]
+        use FwState::*;
 
         ticker.tick().await;
 
-        match state {
+        match fw_state {
             Charging => {
                 if battery > 0.99 {
-                    state = Capture;
+                    fw_state = Capture;
                     started = Instant::now();
                 }
             }
             Capture => {
                 if started.elapsed() > Duration::from_secs(1) {
-                    state = Process;
+                    fw_state = Process;
                     started = Instant::now();
                 }
             }
             Process => {
                 if started.elapsed() > Duration::from_secs(2) {
-                    state = Transmit;
+                    fw_state = Transmit;
                     started = Instant::now();
                 }
             }
             Transmit => {
                 if started.elapsed() > Duration::from_secs(2) {
-                    state = Charging;
+                    fw_state = Charging;
                     started = Instant::now();
                 }
             }
         }
 
-        let power = state.power();
+        let power = fw_state.power();
         battery += power.net() * PERIOD.as_secs_f32() * 0.01;
-        let data = SensorData { battery, state, power };
+        let data = SensorData {
+            battery,
+            state: fw_state,
+            power,
+        };
         tracing::debug!(data=?data);
 
         let msg = serde_json::to_string(&data).unwrap();
         if socket.send(Message::text(msg)).await.is_err() {
             break;
         }
-        write_to_db(&data).await;
-    }
-}
 
-async fn write_to_db(data: &SensorData) {
-    let client = Client::new();
-    let token = std::env::var("INFLUX_TOKEN").unwrap();
-
-    let line_prot = data.to_line();
-    tracing::info!("{line_prot}");
-
-    let org = "amber";
-    let bucket = "capstone";
-    let response = client
-        .post(format!(
-            "http://localhost:8086/api/v2/write?org={org}&bucket={bucket}&precision=ns"
-        ))
-        .header("Content-Type", "text/plain; charset=utf-8")
-        .header("Accept", "application/json")
-        .header("Authorization", format!("Token {token}"))
-        .body(data.to_line())
-        .send()
-        .await;
-
-    match response {
-        Ok(r) => tracing::debug!("Wrote to DB (resp={r:?})"),
-        Err(e) => tracing::error!(err = ?e, "Failed to write to DB"),
+        tracing::trace!("Sending measurement to Logger");
+        app_state
+            .tx
+            .send((data, SystemTime::now()))
+            .await
+            .expect("send to work");
+        tracing::trace!("Sent measurement to Logger");
     }
 }
 
@@ -192,13 +170,31 @@ async fn main() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| format!("{}=debug,tower_http=debug", env!("CARGO_CRATE_NAME")).into()),
+                .unwrap_or_else(|_| format!("{}=debug,tower_http=debug,influx=debug", env!("CARGO_CRATE_NAME")).into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    let db = influx::InfluxConfig {
+        measurement: "mock".to_string(),
+        org: "amber".to_string(),
+        bucket: "capstone".to_string(),
+        address: "http://localhost:8086".to_string(),
+        token: Some(std::env::var("INFLUX_TOKEN").unwrap()),
+        tags: Vec::new(),
+    };
+    let logger = influx::Logger::new(db)
+        .with_flush_interval(Duration::from_secs(1))
+        .with_policies(
+            PolicyRouter::new()
+                .rule("power.*", LogPolicy::on_change(Duration::from_millis(500)))
+                .rule("state", LogPolicy::on_change(Duration::from_millis(500))),
+        );
+
+    let app_state = AppState { tx: logger.sender() };
     let app = Router::new()
         .route("/ws", get(ws_handler))
+        .with_state(app_state)
         .layer(TraceLayer::new_for_http());
 
     let addr: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -206,5 +202,6 @@ async fn main() {
 
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
 
-    axum::serve(listener, app).await.unwrap();
+    let ((), r) = tokio::join!(logger.run(), axum::serve(listener, app));
+    r.unwrap();
 }

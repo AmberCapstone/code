@@ -1,1 +1,1 @@
-include!(concat!(env!("OUT_DIR"), "/_proto_include.rs"));
+include!(concat!(env!("OUT_DIR"), "/proto_include.rs"));

@@ -297,7 +297,7 @@
             "type": "influxdb",
             "uid": "dffo7w1z9cvlsd"
           },
-          "query": "SELECT \"fpga\", \"mcu\", \"camera\",\"antenna\" FROM \"mock\" WHERE $timeFilter",
+          "query": "SELECT \"power.fpga\", \"power.mcu\", \"power.camera\",\"power.antenna\" FROM \"mock\" WHERE $timeFilter",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series"
@@ -322,6 +322,6 @@
   "timezone": "browser",
   "title": "Satellite",
   "uid": "addrxx5",
-  "version": 5,
+  "version": 6,
   "weekStart": ""
 }
