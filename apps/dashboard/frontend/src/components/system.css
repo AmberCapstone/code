@@ -1,0 +1,8 @@
+@keyframes current-flow {
+    from {
+        stroke-dashoffset: 0;
+    }
+    to {
+        stroke-dashoffset: -20;
+    }
+}
