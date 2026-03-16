@@ -188,7 +188,8 @@ async fn main() {
         .with_policies(
             PolicyRouter::new()
                 .rule("power.*", LogPolicy::on_change(Duration::from_millis(500)))
-                .rule("state", LogPolicy::on_change(Duration::from_millis(500))),
+                .rule("state", LogPolicy::on_change(Duration::from_millis(500)))
+                .rule("battery", LogPolicy::after_interval(Duration::from_millis(200))),
         );
 
     let app_state = AppState { tx: logger.sender() };
