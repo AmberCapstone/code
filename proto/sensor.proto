@@ -2,42 +2,42 @@ syntax = "proto3";
 
 package sensor;
 
-import "sensor/flash.proto";
 import "sensor/camera.proto";
+import "sensor/flash.proto";
+import "sensor/fpga.proto";
 import "sensor/measure.proto";
 import "sensor/parameters.proto";
 
-enum Action {
-    ACTION_NONE = 0;
-    ACTION_RESET = 1;
-    ACTION_FLASH = 2;
-    ACTION_READOUT = 3;
-}
-
 enum State {
     STATE_UNKNOWN = 0;
-    STATE_IDLE = 1;
-    STATE_FLASHING = 2;
-    STATE_READOUT = 3;
+    STATE_MANUAL = 1;
+    STATE_CHARGING = 2;
+    STATE_CAPTURE = 3;
+    STATE_LOW_CHARGE = 4;
+}
+
+enum Action {
+    ACTION_NONE = 0;
+    ACTION_ENTER_MANUAL = 1;
+    ACTION_EXIT_MANUAL = 2;
 }
 
 message Command {
     optional Action action = 1;
-    optional flash.Page page = 2;
 
-    optional uint32 host_page_request = 3; // only used in STATE_READOUT
+    optional fpga.Command fpga = 2;
+    optional camera.Command camera = 3;
 }
 
-
 message Status {
+    State state = 1;
+    Measurement measurement = 2;
+    fixed64 alerts = 3;  // bitfield representing Alerts enum
+
+    optional fpga.Status fpga = 4;
+    optional camera.Status camera = 5;
+
     // Diagnostics
-    optional uint32 tx_counter = 1;
-    optional uint32 rx_counter = 2;
-    Measurement measurement = 3;
-    fixed64 alerts = 4; // bitfield representing Alerts enum
-
-    optional State state = 6;
-
-    // Only used in STATE_FLASHING
-    optional flash.Status flash_status = 7;
+    optional uint32 tx_counter = 14;
+    optional uint32 rx_counter = 15;
 }

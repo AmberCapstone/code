@@ -2,25 +2,41 @@ syntax = "proto3";
 
 package sensor.flash;
 
-message Page {
-    optional uint32 page_number = 1;
-    optional bytes data = 2;
-    optional fixed32 crc = 3; // CRC32 of page_number (4 bytes, little endian) then data (256 bytes)
-}
-
 enum State {
     STATE_UNKNOWN = 0;
-    STATE_IDLE = 1;
-    STATE_ERASING = 2;
-    STATE_PROGRAMMING = 3;
-    STATE_READOUT = 4;
-    STATE_DONE = 5;
+    STATE_OFF = 1;
+    STATE_IDLE = 2;
+    STATE_ERASING = 3;
+    STATE_PROGRAMMING = 4;
+    STATE_READOUT = 5;
+    STATE_DONE = 6;
+}
+
+enum Action {
+    ACTION_NONE = 0;
+    ACTION_PROGRAM = 1;
+    ACTION_READOUT = 2;
 }
 
 message Status {
     optional State state = 1;
     optional uint32 stm_page_request = 2;
     optional Page readout_page = 3;
+}
+
+message Command {
+    optional Action action = 1;
+    optional Segment segment =
+        2;                   // checked on ACTION_PROGRAM and ACTION_READOUT
+    optional Page page = 3;  // only for STATE_PROGRAMMING
+    optional uint32 host_page_request = 4;  // only for STATE_READOUT
+}
+
+message Page {
+    optional uint32 page_number = 1;
+    optional bytes data = 2;
+    optional fixed32 crc = 3;  // CRC32 of page_number (4 bytes, little endian)
+                               // then data (256 bytes)
 }
 
 enum Segment {
