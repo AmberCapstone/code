@@ -3,7 +3,6 @@ syntax = "proto3";
 package sensor;
 
 import "sensor/camera.proto";
-import "sensor/flash.proto";
 import "sensor/fpga.proto";
 import "sensor/measure.proto";
 import "sensor/parameters.proto";
@@ -18,8 +17,8 @@ enum State {
 
 enum Action {
     ACTION_NONE = 0;
-    ACTION_ENTER_MANUAL = 1;
-    ACTION_EXIT_MANUAL = 2;
+    ACTION_MONITOR = 1;
+    ACTION_MANUAL = 2;
 }
 
 message Command {

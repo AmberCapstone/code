@@ -15,7 +15,7 @@ use embedded_hal::digital::OutputPin;
 mod command;
 mod id;
 
-use crate::flash::spiflash::{command::Command, id::Id};
+use crate::fpga::flash::spiflash::{command::Command, id::Id};
 
 pub mod size {
     // All sizes in bytes

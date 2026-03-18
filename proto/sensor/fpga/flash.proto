@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package sensor.flash;
+package sensor.fpga.flash;
 
 enum State {
     STATE_UNKNOWN = 0;

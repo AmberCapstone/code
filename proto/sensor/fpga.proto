@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-import "sensor/flash.proto";
+import "sensor/fpga/flash.proto";
 
 package sensor.fpga;
 

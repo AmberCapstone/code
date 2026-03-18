@@ -11,7 +11,7 @@ use embassy_usb::{
 };
 use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 
-use crate::{flash, proto, resources, state_machine};
+use crate::{camera, fpga, proto, resources, sensors, state_machine};
 
 const PACKET_SIZE: u16 = 64;
 
@@ -27,7 +27,7 @@ static STATE: Mutex<ThreadModeRawMutex, State> = Mutex::new(State {
 });
 
 #[embassy_executor::task]
-pub async fn serial_task(u: resources::Usb) {
+pub async fn task(u: resources::Usb) {
     // Config largely copied from embassy/examples/stm32u/src/bin/usb_serial.rs
     let driver = Driver::new(u.usb, resources::Irqs, u.dp, u.dm);
 
@@ -87,7 +87,7 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
             .init_rx_counter(state.rx_counter)
             .init_tx_counter(state.tx_counter)
             .init_state(state_machine::get_state())
-            .init_flash_status(flash::get_status());
+            .init_measurement(sensors::get_measurements());
 
         // Encode with protobuf then COBS
         let mut encoder = PbEncoder::new(heapless::Vec::<u8, MAX_SIZE>::new());
@@ -145,12 +145,12 @@ async fn process_command(mut command: proto::sensor_::Command) {
         state_machine::handle_action(action);
     }
 
-    if let Some(page) = command.take_page() {
-        flash::accept_page(page);
+    if let Some(cmd) = command.take_fpga() {
+        fpga::handle_command(cmd);
     }
 
-    if let Some(host_pg_req) = command.take_host_page_request() {
-        flash::set_readout_req_number(host_pg_req);
+    if let Some(cmd) = command.take_camera() {
+        camera::handle_command(cmd);
     }
 }
 

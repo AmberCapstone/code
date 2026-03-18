@@ -21,9 +21,9 @@ use embassy_time::{Duration, TimeoutError, WithTimeout};
 use embedded_hal::digital::OutputPin;
 
 use crate::{
-    flash::spiflash::SpiFlash,
-    proto::sensor_::flash_::{self, State},
-    resources::Flash,
+    fpga::flash::spiflash::SpiFlash,
+    proto::sensor_::fpga_::flash_::{Command, Page, State, Status},
+    resources::{Flash, Irqs},
 };
 
 mod spiflash;
@@ -61,13 +61,13 @@ impl From<TimeoutError> for Error {
 static TRIGGER: Signal<ThreadModeRawMutex, Trigger> = Signal::new();
 static RESET: Signal<ThreadModeRawMutex, ()> = Signal::new();
 static DONE: Signal<ThreadModeRawMutex, ()> = Signal::new(); // remove once FSM isn't so bossy
-static STATE: Mutex<ThreadModeRawMutex, Cell<flash_::State>> = Mutex::new(Cell::new(flash_::State::Idle));
+static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(State::Idle));
 
 static RN: AtomicU32 = AtomicU32::new(0);
-static PAGE_RX: Channel<ThreadModeRawMutex, flash_::Page, ARQ_N> = Channel::new();
+static PAGE_RX: Channel<ThreadModeRawMutex, Page, ARQ_N> = Channel::new();
 
 static READOUT_RN: Signal<ThreadModeRawMutex, u32> = Signal::new();
-static READOUT_PAGE: Watch<ThreadModeRawMutex, flash_::Page, 1> = Watch::new();
+static READOUT_PAGE: Watch<ThreadModeRawMutex, Page, 1> = Watch::new();
 
 #[embassy_executor::task]
 pub async fn task(mut r: Flash) {
@@ -91,11 +91,13 @@ pub async fn task(mut r: Flash) {
         TRIGGER.reset();
         set_state(State::Idle);
 
+        panic!("NOT SAFE YET - CHECK POWER");
+
         let trigger = TRIGGER.wait().await;
         RESET.reset();
 
         // Activate SPI
-        let mut _reset_n = Output::new(r.reset_n.reborrow(), Level::High, Speed::Low);
+        let mut _reset_n = OutputOpenDrain::new(r.reset_n.reborrow(), Level::High, Speed::Low);
         let cs_n = OutputOpenDrain::new(r.cs_n.reborrow(), Level::High, Speed::Low);
         let flash = spiflash::SpiFlash::init(
             Spi::new(
@@ -105,6 +107,7 @@ pub async fn task(mut r: Flash) {
                 r.miso.reborrow(),
                 r.dma_tx.reborrow(),
                 r.dma_rx.reborrow(),
+                Irqs,
                 spi_config,
             ),
             cs_n,
@@ -197,7 +200,7 @@ async fn readout_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'
         }
 
         if last_page_loaded.is_none_or(|pg| pg != req_num) {
-            let mut page = flash_::Page::default()
+            let mut page = Page::default()
                 .init_page_number(req_num)
                 .init_data(heapless::Vec::from_array([0; PAGE_SIZE as usize]));
 
@@ -226,17 +229,17 @@ fn compute_crc(page_number: u32, data: &[u8], crc: &mut Crc<'_>) -> u32 {
     crc.feed_bytes(data) ^ 0xffff_ffff
 }
 
-pub fn get_status() -> flash_::Status {
-    let mut s = flash_::Status::default();
+pub fn get_status() -> Status {
+    let mut s = Status::default();
 
     let state = get_state();
     s.set_state(state);
 
     match state {
-        flash_::State::Programming => {
+        State::Programming => {
             s.set_stm_page_request(RN.load(Ordering::Acquire));
         }
-        flash_::State::Readout => {
+        State::Readout => {
             if let Some(pg) = READOUT_PAGE.try_get() {
                 s.set_readout_page(pg);
             }
@@ -247,19 +250,21 @@ pub fn get_status() -> flash_::Status {
     s
 }
 
-pub fn accept_page(page: flash_::Page) {
-    let _ = PAGE_RX.try_send(page);
+pub fn handle_command(mut command: Command) {
+    if let Some(page) = command.take_page() {
+        let _ = PAGE_RX.try_send(page);
+    }
+
+    if let Some(host_pg_req) = command.take_host_page_request() {
+        READOUT_RN.signal(host_pg_req);
+    }
 }
 
-pub fn set_readout_req_number(host_pg_req: u32) {
-    READOUT_RN.signal(host_pg_req);
-}
-
-fn get_state() -> flash_::State {
+fn get_state() -> State {
     STATE.lock(Cell::get)
 }
 
-fn set_state(state: flash_::State) {
+fn set_state(state: State) {
     STATE.lock(|s| s.set(state));
 }
 
