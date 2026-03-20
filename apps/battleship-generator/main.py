@@ -22,6 +22,10 @@ TRAIN_SPLIT = 0.7
 VAL_SPLIT = 0.2
 TEST_SPLIT = 0.1
 DATASET_DIR = "dataset"
+# Output image mode
+# "rgb"  -> normal color output
+# "luma" -> save only the Y (luma) channel from YUV as a grayscale image
+OUTPUT_MODE = "luma"
 
 assert abs(TRAIN_SPLIT + VAL_SPLIT + TEST_SPLIT - 1.0) < 1e-9
 
@@ -45,7 +49,7 @@ ROTATIONS = [0, 90, 180, 270]
 DRAW_GRID_PROB = 0.5
 SHIP_BLUR_RADIUS_RANGE = (0.0, 1.2)
 IMAGE_BLUR_RADIUS_RANGE = (0.0, 0.8)
-BG_BRIGHTNESS_RANGE = (0.94, 1.12)
+BG_BRIGHTNESS_RANGE = (0.54, 0.94)
 SHIP_BRIGHTNESS_RANGE = (0.85, 1.15)
 GRID_BRIGHTNESS_RANGE = (0.75, 1.25)
 SPRITE_SIZE_JITTER_PX = 10
@@ -321,6 +325,24 @@ def place_one_random_ship(img, occupied, annotations):
 
     return True
 
+def finalize_output_image(img, output_mode="rgb"):
+    """
+    Convert final image to the requested output mode.
+
+    rgb  -> standard RGB image
+    luma -> extract Y channel from YCbCr and save as single-channel grayscale
+    """
+    rgb_img = img.convert("RGB")
+
+    if output_mode == "rgb":
+        return rgb_img
+
+    if output_mode == "luma":
+        y, _, _ = rgb_img.convert("YCbCr").split()
+        return y
+
+    raise ValueError(f"Unsupported OUTPUT_MODE: {output_mode}")
+
 
 dataset_index = {
     "train": [],
@@ -388,7 +410,8 @@ for img_idx in range(NUM_IMAGES):
     if image_blur > 0.01:
         img = img.filter(ImageFilter.GaussianBlur(radius=image_blur))
 
-    img.convert("RGB").save(img_path)
+    final_img = finalize_output_image(img, OUTPUT_MODE)
+    final_img.save(img_path)
 
     label_record = {
         "image": img_name,
