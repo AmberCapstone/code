@@ -33,11 +33,11 @@ async fn main(spawner: Spawner) {
 
     let r = split_resources!(p);
 
-    spawner.spawn(state_machine::task(r.state_machine)).unwrap();
+    // spawner.spawn(state_machine::task(r.state_machine)).unwrap();
     spawner.spawn(serial::task(r.usb)).unwrap();
-    spawner.spawn(camera::task(r.camera_power, r.camera)).unwrap();
-    spawner.spawn(fpga::task(r.fpga_power, r.fpga)).unwrap();
-    spawner.spawn(fpga::flash::task(r.flash)).unwrap();
+    // spawner.spawn(camera::task(r.camera_power, r.camera)).unwrap();
+    // spawner.spawn(fpga::task(r.fpga_power, r.fpga)).unwrap();
+    // spawner.spawn(fpga::flash::task(r.flash)).unwrap();
     spawner.spawn(debug_led::led_task(r.leds)).unwrap();
     spawner.spawn(sensors::task(r.sensors)).unwrap();
 }

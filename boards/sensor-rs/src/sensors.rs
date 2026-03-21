@@ -38,7 +38,7 @@ pub async fn task(mut r: Sensors) {
             ..Default::default()
         },
     );
-    adc.enable_auto_off();
+    // adc.enable_auto_off(); // breaking the internal channels
 
     let factory_calibration = FactoryCalibration::new();
 
@@ -67,13 +67,15 @@ pub async fn task(mut r: Sensors) {
         )
         .await;
 
-        let conv = Converter::new(&factory_calibration, RESOLUTION, buf[0]);
+        if buf[0] != 0 {
+            let conv = Converter::new(&factory_calibration, RESOLUTION, buf[0]);
 
-        TEMPERATURE_DEGC.store(conv.temperature_degc(buf[1]), Ordering::Relaxed);
-        VDD_MV.store(conv.data_to_mv(buf[2]), Ordering::Relaxed);
-        ISENSE_UA.store(conv.data_to_mv(buf[3]) * ISENSE_UA_PER_MV, Ordering::Relaxed);
-        FPGA_ISENSE_UA.store(conv.data_to_mv(buf[4]) * FPGA_ISENSE_UA_PER_MV, Ordering::Relaxed);
-        VBAT_MV.store(conv.data_to_mv(buf[5]) * VBAT_VOLTAGE_DIV, Ordering::Relaxed);
+            TEMPERATURE_DEGC.store(conv.temperature_degc(buf[1]), Ordering::Relaxed);
+            VDD_MV.store(conv.data_to_mv(buf[2]), Ordering::Relaxed);
+            ISENSE_UA.store(conv.data_to_mv(buf[3]) * ISENSE_UA_PER_MV, Ordering::Relaxed);
+            FPGA_ISENSE_UA.store(conv.data_to_mv(buf[4]) * FPGA_ISENSE_UA_PER_MV, Ordering::Relaxed);
+            VBAT_MV.store(conv.data_to_mv(buf[5]) * VBAT_VOLTAGE_DIV, Ordering::Relaxed);
+        }
 
         ticker.next().await;
     }

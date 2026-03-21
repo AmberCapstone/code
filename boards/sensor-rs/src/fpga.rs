@@ -1,19 +1,24 @@
-use core::cell::Cell;
-use core::future::pending;
+use core::{cell::Cell, future::pending};
 
 use embassy_futures::select::select;
-use embassy_stm32::exti::ExtiInput;
-use embassy_stm32::gpio::{Level, Output, OutputOpenDrain, Pull, Speed};
-use embassy_stm32::spi::{self, Spi};
-use embassy_stm32::time::Hertz;
-use embassy_sync::blocking_mutex::{Mutex, raw::ThreadModeRawMutex};
-use embassy_sync::channel::Channel;
+use embassy_stm32::{
+    exti::ExtiInput,
+    gpio::{Level, Output, OutputOpenDrain, Pull, Speed},
+    spi::{self, Spi},
+    time::Hertz,
+};
+use embassy_sync::{
+    blocking_mutex::{Mutex, raw::ThreadModeRawMutex},
+    channel::Channel,
+};
 use embassy_time::{Duration, Timer};
 
-use crate::flow::poll;
-use crate::power::PowerSignal;
-use crate::proto::sensor_::fpga_::{Action, Command, State, Status, image_};
-use crate::resources::{Fpga, FpgaPower, Irqs};
+use crate::{
+    flow::poll,
+    power::PowerSignal,
+    proto::sensor_::fpga_::{Action, Command, State, Status, image_},
+    resources::{Fpga, FpgaPower, Irqs},
+};
 
 pub mod flash;
 mod spi_cmd;

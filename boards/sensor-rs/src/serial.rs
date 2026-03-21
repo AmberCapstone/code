@@ -1,6 +1,6 @@
 use cobs::CobsDecoder;
 use defmt::{info, trace, warn};
-use embassy_futures::join::join;
+use embassy_futures::join::join3;
 use embassy_stm32::usb::{Driver, Instance};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
 use embassy_time::Timer;
@@ -72,7 +72,7 @@ pub async fn task(u: resources::Usb) {
         }
     };
 
-    join(usb_fut, join(send_fut, recv_fut)).await; // never returns
+    join3(usb_fut, send_fut, recv_fut).await; // never returns
 }
 
 async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>) -> Result<(), Disconnected> {
