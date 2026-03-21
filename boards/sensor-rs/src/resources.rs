@@ -43,9 +43,14 @@ assign_resources! {
         dma_rx: DMA1_CH1,
         dma_tx: DMA1_CH2,
 
-        gpio1: PB1,
+        gpio1: PB0,
+        pwrdn: PB1,
         drdy: PB2,
+        drdy_exti: EXTI2,
+
         cdone: PB10,
+        cdone_exti: EXTI10,
+
         creset_n: PB11,
         cs_n: PB12,
         sck: PB13,
@@ -117,6 +122,7 @@ assign_resources! {
 
 bind_interrupts!(
     pub struct Irqs{
+        EXTI2_3 => exti::InterruptHandler<interrupt::typelevel::EXTI2_3>;
         EXTI4_15 => exti::InterruptHandler<interrupt::typelevel::EXTI4_15>;
 
         USB_DRD_FS => usb::InterruptHandler<peripherals::USB>;

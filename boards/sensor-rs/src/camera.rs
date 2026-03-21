@@ -17,7 +17,7 @@ use crate::resources::{Camera, CameraPower, Irqs};
 mod sccb;
 
 static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(State::Off));
-static POWER_SIGNAL: PowerSignal = PowerSignal::new();
+static POWER_SIGNAL: PowerSignal<()> = PowerSignal::new();
 
 #[embassy_executor::task]
 pub async fn task(r_power: CameraPower, mut r: Camera) {
@@ -29,9 +29,8 @@ pub async fn task(r_power: CameraPower, mut r: Camera) {
         power_en.set_low();
         set_state(State::Off);
 
-        // todo!("Check power sequencing with fpga");
-
         POWER_SIGNAL.wait_for_on().await;
+        todo!("Check power sequencing with fpga");
 
         power_en.set_high();
         select(run_fsm(&mut r), POWER_SIGNAL.wait_for_off()).await;
@@ -99,7 +98,7 @@ pub async fn run_fsm(r: &mut Camera) {
     ];
 
     for (reg, val) in settings {
-        sccb.write_register(reg, val).await;
+        let _ = sccb.write_register(reg, val).await;
     }
 
     set_state(State::Running);
@@ -113,4 +112,6 @@ pub fn get_state() -> State {
     STATE.lock(Cell::get)
 }
 
-pub fn handle_command(command: Command) {}
+pub fn get_status() -> Status {
+    Status::default().init_state(get_state())
+}

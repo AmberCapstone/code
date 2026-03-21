@@ -5,7 +5,7 @@
 use crate::resources::*;
 
 use embassy_executor::Spawner;
-use embassy_stm32::{Config, rcc};
+use embassy_stm32::Config;
 use {defmt_rtt as _, panic_probe as _};
 
 mod camera;
@@ -36,7 +36,8 @@ async fn main(spawner: Spawner) {
     spawner.spawn(state_machine::task(r.state_machine)).unwrap();
     spawner.spawn(serial::task(r.usb)).unwrap();
     spawner.spawn(camera::task(r.camera_power, r.camera)).unwrap();
-    spawner.spawn(fpga::task(r.fpga_power, r.fpga, r.flash)).unwrap();
+    spawner.spawn(fpga::task(r.fpga_power, r.fpga)).unwrap();
+    spawner.spawn(fpga::flash::task(r.flash)).unwrap();
     spawner.spawn(debug_led::led_task(r.leds)).unwrap();
     spawner.spawn(sensors::task(r.sensors)).unwrap();
 }

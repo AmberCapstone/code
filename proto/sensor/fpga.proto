@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "sensor/fpga/flash.proto";
+import "sensor/fpga/image.proto";
 
 package sensor.fpga;
 
@@ -16,19 +17,19 @@ enum State {
 
 enum Action {
     ACTION_NONE = 0;
-    ACTION_RUN = 1;
-    ACTION_SPI_FLASH = 2;
-
-    ACTION_IDLE = 15;
+    ACTION_OFF = 1;
+    ACTION_CAPTURE = 2;
+    ACTION_SPI_FLASH = 3;
 }
 
 message Status {
     State state = 1;
     flash.Status flash = 2;
+
+    optional image.Line line = 3;
 }
 
 message Command {
-    bool enable_power = 1;
     optional Action action = 2;
     optional flash.Command flash = 3;
 }

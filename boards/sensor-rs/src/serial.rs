@@ -1,6 +1,6 @@
 use cobs::CobsDecoder;
 use defmt::{info, trace, warn};
-use embassy_futures::join::join3;
+use embassy_futures::join::join;
 use embassy_stm32::usb::{Driver, Instance};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
 use embassy_time::Timer;
@@ -72,7 +72,7 @@ pub async fn task(u: resources::Usb) {
         }
     };
 
-    join3(usb_fut, send_fut, recv_fut).await; // never returns
+    join(usb_fut, join(send_fut, recv_fut)).await; // never returns
 }
 
 async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>) -> Result<(), Disconnected> {
@@ -87,7 +87,10 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
             .init_rx_counter(state.rx_counter)
             .init_tx_counter(state.tx_counter)
             .init_state(state_machine::get_state())
-            .init_measurement(sensors::get_measurements());
+            .init_measurement(sensors::get_measurements())
+            .init_alerts(0u64) // TODO: actual alerts
+            .init_fpga(fpga::get_status())
+            .init_camera(camera::get_status());
 
         // Encode with protobuf then COBS
         let mut encoder = PbEncoder::new(heapless::Vec::<u8, MAX_SIZE>::new());
@@ -128,29 +131,15 @@ async fn receive_loop<'d, T: Instance + 'd>(receiver: &mut Receiver<'d, Driver<'
                 // Decode with proto
                 let mut pb_dec = PbDecoder::new(&decoder.dest()[..n.frame_size()]);
                 let mut command = proto::sensor_::Command::default();
+
                 if command.decode(&mut pb_dec, n.frame_size()).is_ok() {
-                    process_command(command).await;
+                    STATE.lock().await.rx_counter += 1;
+                    state_machine::handle_command(command);
                 }
             }
             Ok(None) => (),
             Err(_) => warn!("Invalid COBS"),
         }
-    }
-}
-
-async fn process_command(mut command: proto::sensor_::Command) {
-    STATE.lock().await.rx_counter += 1;
-
-    if let Some(action) = command.take_action() {
-        state_machine::handle_action(action);
-    }
-
-    if let Some(cmd) = command.take_fpga() {
-        fpga::handle_command(cmd);
-    }
-
-    if let Some(cmd) = command.take_camera() {
-        camera::handle_command(cmd);
     }
 }
 

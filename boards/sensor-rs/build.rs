@@ -14,6 +14,7 @@ fn generate_proto() -> Result<()> {
         "sensor/camera.proto",
         "sensor/fpga.proto",
         "sensor/fpga/flash.proto",
+        "sensor/fpga/image.proto",
         "sensor/measure.proto",
         "sensor/parameters.proto",
     ];

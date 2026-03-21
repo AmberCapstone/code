@@ -399,7 +399,8 @@ pub enum Reg {
 }
 
 impl Reg {
-    pub fn initial(&self) -> u8 {
+    #[allow(clippy::too_many_lines)]
+    pub const fn initial(self) -> u8 {
         #[allow(clippy::match_same_arms, reason = "values are logically independent")]
         match self {
             Self::GAIN => 0x00,

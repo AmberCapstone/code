@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package sensor.fpga.image;
+
+message Line {
+    uint32 number = 1;
+    bytes data = 2;
+}

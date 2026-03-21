@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 mod reg;
 
 pub use reg::Reg;

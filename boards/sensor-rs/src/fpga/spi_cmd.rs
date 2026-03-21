@@ -1,0 +1,10 @@
+#![allow(unused)]
+
+#[repr(u8)]
+pub enum Command {
+    Write = 0x01,
+    Read = 0x02,
+    FakeCaptureWrite = 0x03,
+    FakeCaptureVga = 0x04,
+    // RealCapture = 0x05, // doesn't exist yet. assumed as long as FakeCapture isn't send
+}
