@@ -4,7 +4,10 @@ use flash_layout::PAGE_SIZE;
 use indicatif::{ProgressBar, ProgressStyle};
 use proto::sensor::{
     self, Action, Command, Status,
-    flash::{self, Segment},
+    fpga::{
+        self,
+        flash::{self, Segment},
+    },
 };
 use serialport::{SerialPortInfo, SerialPortType};
 use std::{
@@ -65,86 +68,123 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    {
-        let mut cmd = Command::default();
-        cmd.set_action(Action::Reset);
-        outgoing.send(cmd).unwrap();
+    // Put into manual mode
+    println!("Entering manual mode");
+    outgoing
+        .send({
+            let mut cmd = Command::default();
+            cmd.set_action(Action::Manual);
+            cmd
+        })
+        .unwrap();
 
-        wait_until(&incoming, |s| {
-            s.state() == sensor::State::Idle && s.flash_status.is_some_and(|f| f.state() == flash::State::Idle)
-        });
-    }
+    wait_until(&incoming, |s| s.state() == sensor::State::Manual);
 
-    {
-        let mut cmd = Command::default();
-        cmd.set_action(Action::Flash);
-        outgoing.send(cmd).unwrap();
+    println!("Activating SPI Flash circuit");
+    outgoing
+        .send(Command {
+            fpga: Some({
+                let mut c = fpga::Command {
+                    flash: Some({
+                        let mut f = flash::Command::default();
+                        f.set_action(flash::Action::Program);
+                        f
+                    }),
+                    ..Default::default()
+                };
+                c.set_action(fpga::Action::SpiFlash);
+                c
+            }),
+            ..Default::default()
+        })
+        .unwrap();
 
-        let bar = ProgressBar::new_spinner().with_message("Erasing");
-        bar.enable_steady_tick(Duration::from_millis(100));
+    wait_until(&incoming, |s| {
+        s.fpga.is_some_and(|fp| {
+            fp.state() == fpga::State::SpiFlash && fp.flash.is_some_and(|fs| fs.state() == flash::State::Erasing)
+        })
+    });
 
-        wait_until(&incoming, |s| {
-            s.state() == sensor::State::Flashing && s.flash_status.map(|f| f.state()) == Some(flash::State::Erasing)
-        });
+    println!("Erasing");
+    let bar = ProgressBar::new_spinner().with_message("Erasing");
+    bar.enable_steady_tick(Duration::from_millis(100));
+    wait_until(&incoming, |s| {
+        s.fpga
+            .and_then(|fp| fp.flash)
+            .is_some_and(|fs| fs.state() == flash::State::Programming)
+    });
 
-        wait_until(&incoming, |s| {
-            s.flash_status.map(|f| f.state()) == Some(flash::State::Programming)
-        });
-
-        bar.finish_and_clear();
-        println!("Erased")
-    }
+    bar.finish_and_clear();
+    println!("Erased");
 
     let sty = ProgressStyle::with_template("{msg:<11} {bar:40.cyan/blue} {bytes}/{total_bytes} [{elapsed_precise}]")
         .unwrap()
         .progress_chars("##-");
-    {
-        let bar = ProgressBar::new(file.size() as u64)
-            .with_style(sty.clone())
-            .with_message("Programming");
 
-        for page in file.pages() {
-            'retry: loop {
-                outgoing
-                    .send(Command {
-                        page: Some(page.clone()),
+    let bar = ProgressBar::new(file.size() as u64)
+        .with_style(sty.clone())
+        .with_message("Programming");
+
+    for page in file.pages() {
+        'retry: loop {
+            outgoing
+                .send(Command {
+                    fpga: Some(fpga::Command {
+                        flash: Some(flash::Command {
+                            page: Some(page.clone()),
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    })
-                    .unwrap();
+                    }),
+                    ..Default::default()
+                })
+                .unwrap();
 
-                let send_time = SystemTime::now();
+            let send_time = SystemTime::now();
 
-                while send_time.elapsed().unwrap() < RESEND_TIMEOUT {
-                    if let Ok(Some(flash_status)) = incoming.try_recv().map(|m| m.flash_status) {
-                        if flash_status.stm_page_request.is_some_and(|rn| rn > page.page_number()) {
+            while send_time.elapsed().unwrap() < RESEND_TIMEOUT {
+                if let Some(flash_status) = incoming.try_recv().ok().and_then(|m| m.fpga).and_then(|fp| fp.flash) {
+                    if flash_status.stm_page_request.is_some_and(|rn| rn > page.page_number()) {
+                        break 'retry;
+                    }
+                    if flash_status.state() != flash::State::Programming {
+                        let is_last_page = (page.page_number() + 1) == file.num_pages() as u32;
+                        if is_last_page {
                             break 'retry;
-                        }
-                        if flash_status.state() != flash::State::Programming {
-                            let is_last_page = (page.page_number() + 1) == file.num_pages() as u32;
-                            if is_last_page {
-                                break 'retry;
-                            } else {
-                                eprintln!("Sensor aborted flashing early");
-                            }
+                        } else {
+                            eprintln!("Sensor aborted flashing early");
                         }
                     }
-                    thread::sleep(Duration::from_millis(2));
                 }
+                thread::sleep(Duration::from_millis(2));
             }
-
-            bar.inc(PAGE_SIZE as u64);
         }
 
-        bar.finish();
+        bar.inc(PAGE_SIZE as u64);
     }
 
-    {
-        let mut cmd = Command::default();
-        cmd.set_action(Action::Readout);
-        outgoing.send(cmd).unwrap();
+    bar.finish();
 
-        wait_until(&incoming, |s| s.state() == sensor::State::Readout);
-    }
+    outgoing
+        .send(Command {
+            fpga: Some({
+                fpga::Command {
+                    flash: Some({
+                        let mut f = flash::Command::default();
+                        f.set_action(flash::Action::Readout);
+                        f
+                    }),
+                    ..Default::default()
+                }
+            }),
+            ..Default::default()
+        })
+        .unwrap();
+    wait_until(&incoming, |s| {
+        s.fpga
+            .and_then(|fp| fp.flash)
+            .is_some_and(|fs| fs.state() == flash::State::Readout)
+    });
 
     let bar = ProgressBar::new(file.size() as u64)
         .with_style(sty)
@@ -156,7 +196,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for tx_page in file.pages() {
         outgoing
             .send(Command {
-                host_page_request: Some(tx_page.page_number()),
+                fpga: Some(fpga::Command {
+                    flash: Some(flash::Command {
+                        host_page_request: Some(tx_page.page_number()),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
                 ..Default::default()
             })
             .unwrap();
@@ -164,7 +210,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             while let Some(rx_page) = incoming
                 .try_recv()
                 .ok()
-                .and_then(|s| s.flash_status)
+                .and_then(|s| s.fpga)
+                .and_then(|f| f.flash)
                 .and_then(|f| f.readout_page)
             {
                 if rx_page.page_number() == tx_page.page_number() {
@@ -182,6 +229,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     bar.finish();
+
+    println!("Exiting manual mode");
+    outgoing
+        .send({
+            let mut cmd = Command::default();
+            cmd.set_action(Action::Monitor);
+            cmd
+        })
+        .unwrap();
+
+    wait_until(&incoming, |s| s.state() != sensor::State::Manual);
 
     stop_signal.store(true, Ordering::Relaxed);
 

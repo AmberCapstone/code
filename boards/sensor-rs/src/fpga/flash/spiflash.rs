@@ -23,10 +23,10 @@ pub mod size {
     pub const SUBSECTOR: u32 = 0x1000;
     pub const SECTOR: u32 = 0x1_0000;
 
-    #[cfg(not(feature = "pcb"))] // st M25PE10
+    #[cfg(feature = "nucleo")] // st M25PE10
     pub const CHIP: u32 = 0x2_0000;
 
-    #[cfg(feature = "pcb")] // winbond W25Q80
+    #[cfg(not(feature = "nucleo"))] // winbond W25Q80
     pub const CHIP: u32 = 0x10_0000;
 }
 

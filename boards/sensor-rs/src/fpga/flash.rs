@@ -80,9 +80,16 @@ pub async fn task(mut r: Flash) {
     #[allow(clippy::never_loop)]
     loop {
         set_state(State::Off);
-
         POWER_SIGNAL.wait_for_on().await;
 
+        select(run(&mut r), POWER_SIGNAL.wait_for_off()).await;
+    }
+}
+
+async fn run(r: &mut Flash) {
+    loop {
+        set_state(State::Idle);
+        OPERATION.reset();
         let trigger = OPERATION.wait().await;
         DONE.reset();
 
@@ -128,7 +135,7 @@ pub async fn task(mut r: Flash) {
             .unwrap(),
         );
 
-        select(trigger.handle(&mut flash, &mut crc), POWER_SIGNAL.wait_for_off()).await;
+        trigger.handle(&mut flash, &mut crc).await;
         DONE.signal(());
 
         // Deactivate SPI
@@ -276,7 +283,7 @@ pub fn handle_command(mut command: Command) {
     }
 }
 
-fn get_state() -> State {
+pub fn get_state() -> State {
     STATE.lock(Cell::get)
 }
 

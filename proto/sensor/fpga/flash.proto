@@ -5,10 +5,11 @@ package sensor.fpga.flash;
 enum State {
     STATE_UNKNOWN = 0;
     STATE_OFF = 1;
-    STATE_ERASING = 2;
-    STATE_PROGRAMMING = 3;
-    STATE_READOUT = 4;
-    STATE_DONE = 5;
+    STATE_IDLE = 2;
+    STATE_ERASING = 3;
+    STATE_PROGRAMMING = 4;
+    STATE_READOUT = 5;
+    STATE_DONE = 6;
 }
 
 enum Action {

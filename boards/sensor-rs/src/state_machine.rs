@@ -2,13 +2,13 @@ use core::cell::Cell;
 
 use crate::{
     flow::ChangeSignal,
-    fpga,
+    fpga::{self, flash},
     proto::sensor_::{self, Action, State, fpga_},
     resources::{self, Irqs},
     sensors,
 };
 
-use defmt::info;
+use defmt::{Debug2Format, info};
 use embassy_futures::select::select;
 use embassy_stm32::{exti::ExtiInput, gpio::Pull};
 use embassy_sync::{blocking_mutex::Mutex, blocking_mutex::raw::ThreadModeRawMutex};
@@ -30,7 +30,7 @@ static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(Stat
 
 #[embassy_executor::task]
 pub async fn task(r: resources::StateMachine) {
-    let mut vbat_ok = ExtiInput::new(r.vbat_ok, r.vbat_exti, Pull::None, Irqs);
+    let mut vbat_ok = ExtiInput::new(r.vbat_ok, r.vbat_exti, Pull::Down, Irqs);
 
     // let camera_control = CameraControl {};
     // let fpga_control = FpgaControl {};
@@ -46,7 +46,7 @@ async fn low_power_loop() -> ! {
     fpga::handle_command(fpga_::Command::default().init_action(fpga_::Action::Off));
     loop {
         info!("In low_power_loop()");
-        Timer::after_millis(1000).await;
+        Timer::after_millis(2000).await;
         // Send a message over serial
     }
 }
@@ -64,21 +64,29 @@ async fn normal_loop() -> ! {
 async fn manual_loop() -> ! {
     set_state(State::Manual);
     loop {
-        info!("In manual_loop()");
-        Timer::after_millis(500).await;
+        info!(
+            "MANUAL, FPGA = {:?}, FLASH = {:?}",
+            Debug2Format(&fpga::get_state()),
+            Debug2Format(&flash::get_state())
+        );
+        Timer::after_millis(2000).await;
     }
 }
 
 async fn monitor() -> ! {
     loop {
-        info!("In monitor_loop()");
+        info!(
+            "MONITOR, FPGA = {:?}, FLASH = {:?}",
+            Debug2Format(&fpga::get_state()),
+            Debug2Format(&flash::get_state())
+        );
         set_state(State::Charging);
 
-        while sensors::get_vbat_mv() < MIN_CAPTURE_VBAT_MV {
-            Timer::after_millis(100).await;
-        }
+        // while sensors::get_vbat_mv() < MIN_CAPTURE_VBAT_MV {
+        //     Timer::after_millis(100).await;
+        // }
 
-        set_state(State::Capture);
+        // set_state(State::Capture);
 
         Timer::after_millis(1000).await;
         // add actual code

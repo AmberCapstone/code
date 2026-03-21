@@ -42,7 +42,7 @@ panic-probe = "1.0.0"
 pedantic = "warn"
 
 [features]
-pcb = []
+nucleo = []
 
 [profile.release]
 debug = 2

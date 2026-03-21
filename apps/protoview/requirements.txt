@@ -1,0 +1,6 @@
+pyserial
+protobuf
+textual
+textual-fspicker
+tqdm
+-e ../../lib/python/cobs

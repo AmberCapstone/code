@@ -1,5 +1,6 @@
 use core::{cell::Cell, future::pending};
 
+use defmt::{Debug2Format, debug, info};
 use embassy_futures::select::select;
 use embassy_stm32::{
     exti::ExtiInput,
@@ -71,6 +72,7 @@ pub async fn run_spiflash(r: &mut Fpga) {
     let mut reset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
     let mut cdone = ExtiInput::new(r.cdone.reborrow(), r.cdone_exti.reborrow(), Pull::None, Irqs);
 
+    #[cfg(not(feature = "nucleo"))]
     cdone.wait_for_high().await;
 
     reset_n.set_low();
@@ -150,6 +152,7 @@ pub fn get_state() -> State {
 
 pub fn handle_command(mut command: Command) {
     if let Some(action) = command.take_action() {
+        debug!("FPGA received Action={:?}", Debug2Format(&action));
         match action {
             Action::Capture => {
                 if get_state() == State::Off {
