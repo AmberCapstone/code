@@ -1,0 +1,23 @@
+[project]
+name = "battleship-detector"
+version = "0.1.0"
+description = "Boat detection verification suite for QQVGA imagery"
+requires-python = ">=3.11"
+
+dependencies = [
+    "opencv-python",
+    "numpy",
+    # Standard PyPI torch wheels include MPS support on Apple Silicon —
+    # no extra index needed. For CUDA, see the [tool.uv] block below.
+    "torch",
+    "torchvision",
+    "tqdm",
+    "matplotlib",
+]
+
+[project.scripts]
+battleship-detector = "battleship_detector:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

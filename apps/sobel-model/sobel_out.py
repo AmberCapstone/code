@@ -5,6 +5,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
+
 
 @dataclass(frozen=True)
 class SobelOutputs:
@@ -163,20 +165,63 @@ def build_output_image(sobel: SobelOutputs, mode: str) -> np.ndarray:
     raise ValueError(f"Unsupported mode: {mode}")
 
 
+def process_single(
+    input_path: Path,
+    output_path: Path,
+    mode: str,
+    dump_npy: bool,
+) -> None:
+    gray = load_grayscale_image(input_path)
+    sobel = sobel_streaming_fpga_like(gray)
+    out_img = build_output_image(sobel, mode)
+
+    ok = cv2.imwrite(str(output_path), out_img)
+    if not ok:
+        raise RuntimeError(f"Failed to write output image: {output_path}")
+
+    if dump_npy:
+        stem = output_path.with_suffix("")
+        np.save(str(stem) + "_gx.npy", sobel.gx)
+        np.save(str(stem) + "_gy.npy", sobel.gy)
+        np.save(str(stem) + "_mag.npy", sobel.mag)
+        np.save(str(stem) + "_valid.npy", sobel.valid)
+
+    print(f"  {input_path.name} -> {output_path.name}  [{gray.shape[1]}x{gray.shape[0]}]")
+
+
+def collect_images(directory: Path) -> list[Path]:
+    return sorted(
+        p for p in directory.iterdir()
+        if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
+    )
+
+
 def parse_args():
     p = argparse.ArgumentParser(description="FPGA-like streaming Sobel image exporter")
-    p.add_argument("input", type=Path, help="Input image path")
-    p.add_argument("output", type=Path, help="Output image path, e.g. out.png")
+    p.add_argument(
+        "input",
+        type=Path,
+        help="Input image file, or a directory of images to process in batch",
+    )
+    p.add_argument(
+        "output",
+        type=Path,
+        nargs="?",
+        help=(
+            "Output path. For a single file: output image path (e.g. out.png). "
+            "For a directory: output directory (default: <input_dir>/sobel_out/)"
+        ),
+    )
     p.add_argument(
         "--mode",
         choices=["gx", "gy", "abs_gx", "abs_gy", "mag"],
         default="mag",
-        help="Which Sobel result to save",
+        help="Which Sobel result to save (default: mag)",
     )
     p.add_argument(
         "--dump-npy",
         action="store_true",
-        help="Also save raw gx/gy/mag arrays as .npy next to the output image",
+        help="Also save raw gx/gy/mag arrays as .npy next to each output image",
     )
     return p.parse_args()
 
@@ -184,25 +229,48 @@ def parse_args():
 def main():
     args = parse_args()
 
-    gray = load_grayscale_image(args.input)
-    sobel = sobel_streaming_fpga_like(gray)
-    out_img = build_output_image(sobel, args.mode)
+    # ── Single-file mode ──────────────────────────────────────────────────────
+    if args.input.is_file():
+        output_path = args.output
+        if output_path is None:
+            output_path = args.input.with_name(args.input.stem + "_sobel" + args.input.suffix)
 
-    ok = cv2.imwrite(str(args.output), out_img)
-    if not ok:
-        raise RuntimeError(f"Failed to write output image: {args.output}")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        print(f"Input : {args.input}")
+        print(f"Output: {output_path}")
+        print(f"Mode  : {args.mode}")
+        process_single(args.input, output_path, args.mode, args.dump_npy)
+        return
 
-    if args.dump_npy:
-        stem = args.output.with_suffix("")
-        np.save(str(stem) + "_gx.npy", sobel.gx)
-        np.save(str(stem) + "_gy.npy", sobel.gy)
-        np.save(str(stem) + "_mag.npy", sobel.mag)
-        np.save(str(stem) + "_valid.npy", sobel.valid)
+    # ── Directory (batch) mode ────────────────────────────────────────────────
+    if args.input.is_dir():
+        out_dir = args.output if args.output is not None else args.input / "sobel_out"
+        out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Input : {args.input}")
-    print(f"Output: {args.output}")
-    print(f"Mode  : {args.mode}")
-    print(f"Size  : {gray.shape[1]}x{gray.shape[0]}")
+        images = collect_images(args.input)
+        if not images:
+            print(f"No image files found in {args.input}")
+            return
+
+        print(f"Input dir : {args.input}")
+        print(f"Output dir: {out_dir}")
+        print(f"Mode      : {args.mode}")
+        print(f"Images    : {len(images)}\n")
+
+        succeeded, failed = 0, 0
+        for img_path in images:
+            out_path = out_dir / img_path.name
+            try:
+                process_single(img_path, out_path, args.mode, args.dump_npy)
+                succeeded += 1
+            except Exception as exc:
+                print(f"  WARNING: skipping {img_path.name} — {exc}")
+                failed += 1
+
+        print(f"\nDone. {succeeded} succeeded, {failed} failed.")
+        return
+
+    raise FileNotFoundError(f"Input path not found or not a file/directory: {args.input}")
 
 
 if __name__ == "__main__":
