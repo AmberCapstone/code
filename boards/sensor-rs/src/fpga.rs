@@ -27,6 +27,7 @@ mod spi_cmd;
 enum RunMode {
     Capture,
     SpiFlash,
+    RunConstant,
 }
 
 const NUM_LINES: u32 = 240; // for QVGA
@@ -63,8 +64,31 @@ pub async fn task(r_power: FpgaPower, mut r_fpga: Fpga) {
             RunMode::SpiFlash => {
                 select(run_spiflash(&mut r_fpga), POWER_SIGNAL.wait_for_off()).await;
             }
+            RunMode::RunConstant => {
+                select(run_constant(&mut r_fpga), POWER_SIGNAL.wait_for_off()).await;
+            }
         }
     }
+}
+
+pub async fn run_constant(r: &mut Fpga) {
+    set_state(State::Booting);
+    let mut _reset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
+    let mut cdone = ExtiInput::new(r.cdone.reborrow(), r.cdone_exti.reborrow(), Pull::None, Irqs);
+
+    info!("Waiting for CDONE");
+    #[cfg(not(feature = "nucleo"))]
+    cdone.wait_for_high().await;
+    info!("CDONE complete");
+
+    set_state(State::Running);
+
+    loop {
+        info!("FPGA RunConstant");
+        Timer::after_millis(2000).await;
+    }
+
+    // pending::<()>().await; // wait for a command to turn it off
 }
 
 pub async fn run_spiflash(r: &mut Fpga) {
@@ -72,8 +96,8 @@ pub async fn run_spiflash(r: &mut Fpga) {
     let mut reset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
     let mut cdone = ExtiInput::new(r.cdone.reborrow(), r.cdone_exti.reborrow(), Pull::None, Irqs);
 
-    #[cfg(not(feature = "nucleo"))]
-    cdone.wait_for_high().await;
+    // #[cfg(not(feature = "nucleo"))]
+    // cdone.wait_for_high().await;
 
     reset_n.set_low();
     set_state(State::SpiFlash);
@@ -162,6 +186,11 @@ pub fn handle_command(mut command: Command) {
             Action::SpiFlash => {
                 if get_state() == State::Off {
                     POWER_SIGNAL.turn_on(RunMode::SpiFlash);
+                }
+            }
+            Action::RunConstant => {
+                if get_state() == State::Off {
+                    POWER_SIGNAL.turn_on(RunMode::RunConstant);
                 }
             }
             Action::Off => {

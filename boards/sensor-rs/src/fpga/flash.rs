@@ -105,6 +105,16 @@ async fn run(r: &mut Flash) {
                 r.dma_tx.reborrow(),
                 r.dma_rx.reborrow(),
                 Irqs,
+                #[cfg(not(feature = "nucleo"))]
+                {
+                    let mut c = spi::Config::default();
+                    c.bit_order = spi::BitOrder::MsbFirst;
+                    c.mode = spi::MODE_3;
+                    c.frequency = Hertz(1_000_000);
+                    c.gpio_speed = Speed::VeryHigh;
+                    c
+                },
+                #[cfg(feature = "nucleo")]
                 {
                     let mut c = spi::Config::default();
                     c.bit_order = spi::BitOrder::MsbFirst;

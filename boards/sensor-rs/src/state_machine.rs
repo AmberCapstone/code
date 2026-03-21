@@ -30,7 +30,7 @@ static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(Stat
 
 #[embassy_executor::task]
 pub async fn task(r: resources::StateMachine) {
-    let mut vbat_ok = ExtiInput::new(r.vbat_ok, r.vbat_exti, Pull::Down, Irqs);
+    let mut vbat_ok = ExtiInput::new(r.vbat_ok, r.vbat_exti, Pull::None, Irqs);
 
     // let camera_control = CameraControl {};
     // let fpga_control = FpgaControl {};

@@ -18,7 +18,7 @@ impl Id {
     #[cfg(not(feature = "nucleo"))]
     pub const fn expected() -> Self {
         Self {
-            manufacturer: 0x3f,
+            manufacturer: 0xef,
             memory_type: 0x40,
             capacity: 0x14,
         }

@@ -68,6 +68,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    println!("Exiting manual mode");
+    outgoing
+        .send({
+            let mut cmd = Command::default();
+            cmd.set_action(Action::Monitor);
+            cmd
+        })
+        .unwrap();
+
+    wait_until(&incoming, |s| s.state() == sensor::State::Manual);
+
     // Put into manual mode
     println!("Entering manual mode");
     outgoing
@@ -240,6 +251,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     wait_until(&incoming, |s| s.state() != sensor::State::Manual);
+
+    println!("Entering manual mode");
+    outgoing
+        .send({
+            let mut cmd = Command::default();
+            cmd.set_action(Action::Manual);
+            cmd
+        })
+        .unwrap();
+
+    wait_until(&incoming, |s| s.state() == sensor::State::Manual);
+
+    println!("Starting FPGA");
+
+    outgoing
+        .send(Command {
+            fpga: Some({
+                let mut c = fpga::Command::default();
+                c.set_action(fpga::Action::RunConstant);
+                c
+            }),
+            ..Default::default()
+        })
+        .unwrap();
+
+    wait_until(&incoming, |s| {
+        s.fpga.is_some_and(|fp| fp.state() == fpga::State::Running)
+    });
 
     stop_signal.store(true, Ordering::Relaxed);
 

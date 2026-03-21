@@ -105,7 +105,7 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
             info!("Connected to SPI Flash");
             Ok(s)
         } else {
-            error!("Unexpected ID");
+            error!("Unexpected ID {:?}", Debug2Format(&id));
             Err(Error::UnxpectedId)
         }
     }

@@ -20,6 +20,8 @@ enum Action {
     ACTION_OFF = 1;
     ACTION_CAPTURE = 2;
     ACTION_SPI_FLASH = 3;
+
+    ACTION_RUN_CONSTANT = 15;
 }
 
 message Status {
