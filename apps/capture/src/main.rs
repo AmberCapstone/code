@@ -1,5 +1,9 @@
+use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
-use proto::sensor::{self, Action, Command, Status, fpga};
+use proto::sensor::{
+    self, Action, Command, Status,
+    fpga::{self, CaptureSource},
+};
 use serialport::{SerialPortInfo, SerialPortType};
 use std::{
     path::Path,
@@ -10,7 +14,15 @@ use std::{
 const NUM_LINES: u32 = 240;
 const BYTE_PER_LINE: u32 = 320;
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about=None)]
+struct Args {
+    source: StrSource,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+
     let amber_ports: Vec<SerialPortInfo> = serialport::available_ports()?
         .into_iter()
         .filter(|p| {
@@ -65,6 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             fpga: Some({
                 let mut c = fpga::Command::default();
                 c.set_action(fpga::Action::Capture);
+                c.set_capture_source(args.source.into());
                 c
             }),
             ..Default::default()
@@ -130,6 +143,23 @@ fn wait_until(incoming: &mpsc::Receiver<Status>, done: impl Fn(Status) -> bool) 
         let sts = incoming.recv().unwrap();
         if done(sts) {
             break;
+        }
+    }
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+enum StrSource {
+    Camera,
+    FakeVga,
+    FakeSram,
+}
+
+impl From<StrSource> for CaptureSource {
+    fn from(val: StrSource) -> Self {
+        match val {
+            StrSource::Camera => Self::Camera,
+            StrSource::FakeVga => Self::FakeVga,
+            StrSource::FakeSram => Self::FakeSram,
         }
     }
 }

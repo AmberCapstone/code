@@ -6,5 +6,6 @@ pub enum Command {
     Read = 0x02,
     FakeCaptureWrite = 0x03,
     FakeCaptureVga = 0x04,
+    Reset = 0x00,
     // RealCapture = 0x05, // doesn't exist yet. assumed as long as FakeCapture isn't send
 }

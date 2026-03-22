@@ -1,9 +1,9 @@
 syntax = "proto3";
 
+package sensor.fpga;
+
 import "sensor/fpga/flash.proto";
 import "sensor/fpga/image.proto";
-
-package sensor.fpga;
 
 enum State {
     STATE_UNKNOWN = 0;
@@ -24,6 +24,13 @@ enum Action {
     ACTION_RUN_CONSTANT = 15;
 }
 
+enum CaptureSource {
+    CAPTURE_SOURCE_UNKNOWN = 0;
+    CAPTURE_SOURCE_CAMERA = 1;
+    CAPTURE_SOURCE_FAKE_VGA = 2;
+    CAPTURE_SOURCE_FAKE_SRAM = 3;
+}
+
 message Status {
     State state = 1;
     flash.Status flash = 2;
@@ -34,4 +41,6 @@ message Status {
 message Command {
     optional Action action = 2;
     optional flash.Command flash = 3;
+
+    optional CaptureSource capture_source = 4;
 }
