@@ -1,12 +1,11 @@
-use embassy_stm32::adc::{Resolution, resolution_to_max_count};
+use embassy_stm32::adc::{Resolution, VREF_CALIB_MV, resolution_to_max_count};
 
-mod reg {
+pub mod reg {
     pub const TS_CAL1: *const u16 = 0x1FFF_6E68 as *const u16;
     pub const TS_CAL2: *const u16 = 0x1FFF_6E8A as *const u16;
     pub const VREFINT_CAL: *const u16 = 0x1FFF_6EA4 as *const u16;
 }
 
-const VREFINT_CAL_VREF_MV: u32 = 3000;
 const VREFINT_CAL_RESOLUTION: Resolution = Resolution::BITS12;
 
 const TS_CAL1_TEMP: i32 = 30;
@@ -32,14 +31,14 @@ impl FactoryCalibration {
     pub fn new() -> Self {
         Self {
             ts_cal1_raw: i32::from(unsafe { core::ptr::read_unaligned(reg::TS_CAL1) }),
-            ts_cal2_raw: i32::from(unsafe { core::ptr::read_unaligned(reg::TS_CAL2) }) as i32,
+            ts_cal2_raw: i32::from(unsafe { core::ptr::read_unaligned(reg::TS_CAL2) }),
             vrefint_cal: unsafe { core::ptr::read_unaligned(reg::VREFINT_CAL) },
         }
     }
 
     /// `__LL_ADC_CALC_VREFANALOG_VOLTAGE`
     fn calc_vrefanalog_mv(&self, vrefint_adc_data: u16, resolution: Resolution) -> u32 {
-        u32::from(self.vrefint_cal) * VREFINT_CAL_VREF_MV
+        u32::from(self.vrefint_cal) * VREF_CALIB_MV
             / u32::from(convert_data_resolution(
                 vrefint_adc_data,
                 resolution,
@@ -49,15 +48,14 @@ impl FactoryCalibration {
 
     /// `__LL_ADC_CALC_TEMPERATURE`
     fn calc_temperature_degc(&self, vrefanalog_mv: u32, ts_adc_data: u16, resolution: Resolution) -> i32 {
-        let ts_data = u32::from(convert_data_resolution(
+        let ts_data = i32::from(convert_data_resolution(
             ts_adc_data,
             resolution,
             TEMPSENSOR_CAL_RESOLUTION,
-        )) * vrefanalog_mv
-            / TEMPSENSOR_CAL_VREFANALOG_MV;
+        )) * vrefanalog_mv.cast_signed()
+            / TEMPSENSOR_CAL_VREFANALOG_MV.cast_signed();
 
-        (ts_data.cast_signed() - self.ts_cal1_raw) * (TS_CAL2_TEMP - TS_CAL1_TEMP)
-            / (self.ts_cal2_raw - self.ts_cal1_raw)
+        (ts_data - self.ts_cal1_raw) * (TS_CAL2_TEMP - TS_CAL1_TEMP) / (self.ts_cal2_raw - self.ts_cal1_raw)
             + TS_CAL1_TEMP
     }
 }
