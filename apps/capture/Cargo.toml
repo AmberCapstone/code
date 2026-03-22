@@ -1,0 +1,21 @@
+[package]
+name = "capture"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.60", features = ["derive"] }
+cobs = "0.5.1"
+crc = "3.4.0"
+image = "0.25.10"
+indicatif = "0.18.4"
+prost = "0.14.3"
+proto = { version = "0.1.0", path = "../../lib/rust/proto" }
+serial = { version = "0.1.0", path = "../../lib/rust/serial" }
+serialport = { version = "4.8.1", features = ["usbportinfo-interface"] }
+
+[build-dependencies]
+prost-build = "0.14.3"
+
+[lints]
+workspace = true

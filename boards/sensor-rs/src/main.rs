@@ -38,6 +38,6 @@ async fn main(spawner: Spawner) {
     // spawner.spawn(camera::task(r.camera_power, r.camera)).unwrap();
     spawner.spawn(fpga::task(r.fpga_power, r.fpga)).unwrap();
     spawner.spawn(fpga::flash::task(r.flash)).unwrap();
-    // spawner.spawn(debug_led::led_task(r.leds)).unwrap();
+    spawner.spawn(debug_led::led_task(r.leds)).unwrap();
     spawner.spawn(sensors::task(r.sensors)).unwrap();
 }

@@ -44,7 +44,7 @@ assign_resources! {
         dma_tx: DMA1_CH2,
 
         gpio1: PB0,
-        pwrdn: PB1,
+        pwrdn_n: PB1,
         drdy: PB2,
         drdy_exti: EXTI2,
 

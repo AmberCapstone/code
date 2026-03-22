@@ -55,7 +55,6 @@ pub async fn task(r_power: FpgaPower, mut r_fpga: Fpga) {
         let mode = POWER_SIGNAL.wait_for_on().await;
 
         power_en.set_high();
-        Timer::after_millis(100).await; // give time to boot up
 
         match mode {
             RunMode::Capture => {
@@ -87,19 +86,12 @@ pub async fn run_constant(r: &mut Fpga) {
         info!("FPGA RunConstant");
         Timer::after_millis(2000).await;
     }
-
-    // pending::<()>().await; // wait for a command to turn it off
 }
 
 pub async fn run_spiflash(r: &mut Fpga) {
     set_state(State::Booting);
-    let mut reset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
-    let mut cdone = ExtiInput::new(r.cdone.reborrow(), r.cdone_exti.reborrow(), Pull::None, Irqs);
+    let _reset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::Low, Speed::Low);
 
-    // #[cfg(not(feature = "nucleo"))]
-    // cdone.wait_for_high().await;
-
-    reset_n.set_low();
     set_state(State::SpiFlash);
 
     flash::turn_on();
@@ -109,7 +101,7 @@ pub async fn run_spiflash(r: &mut Fpga) {
 
 pub async fn run_capture(r: &mut Fpga) {
     set_state(State::Booting);
-    let _reset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
+    let _creset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
     let mut cdone = ExtiInput::new(r.cdone.reborrow(), r.cdone_exti.reborrow(), Pull::None, Irqs);
 
     cdone.wait_for_high().await;
@@ -117,9 +109,13 @@ pub async fn run_capture(r: &mut Fpga) {
 
     let mut start_capture = OutputOpenDrain::new(r.gpio1.reborrow(), Level::Low, Speed::Low);
     let mut drdy = ExtiInput::new(r.drdy.reborrow(), r.drdy_exti.reborrow(), Pull::Up, Irqs);
-    let _pwrdn = OutputOpenDrain::new(r.pwrdn.reborrow(), Level::Low, Speed::Low);
-
     let mut cs_n = OutputOpenDrain::new(r.cs_n.reborrow(), Level::High, Speed::Low);
+
+    // Reset FPGA internals
+    let mut pwrdn_n = OutputOpenDrain::new(r.pwrdn_n.reborrow(), Level::Low, Speed::Low);
+    Timer::after_micros(100).await;
+    pwrdn_n.set_high();
+    Timer::after_micros(100).await;
 
     let mut spi = Spi::new(
         r.spi.reborrow(),
@@ -133,23 +129,27 @@ pub async fn run_capture(r: &mut Fpga) {
             let mut c = spi::Config::default();
             c.bit_order = spi::BitOrder::LsbFirst;
             c.mode = spi::MODE_0;
-            c.frequency = Hertz(4_000_000);
+            c.frequency = Hertz(1_000_000);
             c.gpio_speed = Speed::VeryHigh;
             c
         },
     );
 
-    cs_n.set_low();
-    let _ = spi.write(&[spi_cmd::Command::FakeCaptureWrite as u8]).await;
-    cs_n.set_high();
+    // info!("Sending Capture over SPI");
+    // cs_n.set_low();
+    // let _ = spi.write(&[spi_cmd::Command::FakeCaptureWrite as u8]).await;
+    // cs_n.set_high();
 
     start_capture.set_high();
+    Timer::after_micros(100).await;
+    start_capture.set_low();
 
-    // fpga running
-
+    info!("Waiting for drdy");
     drdy.wait_for_high().await;
+    info!("Seen DRDY");
 
     for line_no in 0..NUM_LINES {
+        info!("Line no {}", line_no);
         let mut new_line = image_::Line::default()
             .init_number(line_no)
             .init_data([0u8; LINE_LEN as usize].into());

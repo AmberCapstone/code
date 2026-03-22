@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .unwrap();
 
-    wait_until(&incoming, |s| s.state() == sensor::State::Manual);
+    wait_until(&incoming, |s| s.state() != sensor::State::Manual);
 
     // Put into manual mode
     println!("Entering manual mode");
