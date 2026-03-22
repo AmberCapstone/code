@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+import "sensor/fpga/flash.proto";
+import "sensor/fpga/image.proto";
+
+package sensor.fpga;
+
+enum State {
+    STATE_UNKNOWN = 0;
+    STATE_OFF = 1;
+    STATE_BOOTING = 2;
+    STATE_RUNNING = 3;
+
+    STATE_SPI_FLASH = 14;
+    STATE_LOW_POWER_IDLE = 15;
+}
+
+enum Action {
+    ACTION_NONE = 0;
+    ACTION_OFF = 1;
+    ACTION_CAPTURE = 2;
+    ACTION_SPI_FLASH = 3;
+
+    ACTION_RUN_CONSTANT = 15;
+}
+
+message Status {
+    State state = 1;
+    flash.Status flash = 2;
+
+    optional image.Line line = 3;
+}
+
+message Command {
+    optional Action action = 2;
+    optional flash.Command flash = 3;
+}

@@ -8,5 +8,29 @@ enum State {
     STATE_BOOTING = 2;
     STATE_CONFIGURING = 3;
     STATE_RUNNING = 4;
+
+    STATE_LOW_POWER_IDLE = 15;
 }
 
+enum Action {
+    ACTION_NONE = 0;
+    ACTION_RUN = 1;
+    ACTION_RECONFIGURE = 2;
+
+    ACTION_IDLE = 15;
+}
+
+message Status {
+    State state = 1;
+    optional Settings current_settings = 2;
+}
+
+message Command {
+    bool enable_power = 1;
+    optional Action action = 2;
+    optional Settings new_settings = 3;
+}
+
+message Settings {
+    uint32 exposure_us = 1;
+}

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/dashboard/backend",
+members = ["apps/capture","apps/dashboard/backend",
     "apps/flasher",
     "lib/rust/flash-layout", "lib/rust/influx",
     "lib/rust/proto",

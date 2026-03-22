@@ -7,12 +7,15 @@ use defmt::{debug, error, info};
 use embassy_futures::select::select;
 use embassy_stm32::{
     crc::{self, Crc},
-    gpio::{Level, Output, OutputOpenDrain, Speed},
+    gpio::{Level, OutputOpenDrain, Speed},
     spi::{self, Spi},
     time::Hertz,
 };
 use embassy_sync::{
-    blocking_mutex::{Mutex, raw::ThreadModeRawMutex},
+    blocking_mutex::{
+        Mutex,
+        raw::{CriticalSectionRawMutex, ThreadModeRawMutex},
+    },
     channel::Channel,
     signal::Signal,
     watch::Watch,
@@ -21,9 +24,10 @@ use embassy_time::{Duration, TimeoutError, WithTimeout};
 use embedded_hal::digital::OutputPin;
 
 use crate::{
-    flash::spiflash::SpiFlash,
-    proto::sensor_::flash_::{self, State},
-    resources::Flash,
+    fpga::flash::spiflash::SpiFlash,
+    power::PowerSignal,
+    proto::sensor_::fpga_::flash_::{Action, Command, Page, State, Status},
+    resources::{Flash, Irqs},
 };
 
 mod spiflash;
@@ -58,44 +62,39 @@ impl From<TimeoutError> for Error {
     }
 }
 
-static TRIGGER: Signal<ThreadModeRawMutex, Trigger> = Signal::new();
-static RESET: Signal<ThreadModeRawMutex, ()> = Signal::new();
-static DONE: Signal<ThreadModeRawMutex, ()> = Signal::new(); // remove once FSM isn't so bossy
-static STATE: Mutex<ThreadModeRawMutex, Cell<flash_::State>> = Mutex::new(Cell::new(flash_::State::Idle));
+static POWER_SIGNAL: PowerSignal<()> = PowerSignal::new();
+static OPERATION: Signal<CriticalSectionRawMutex, Trigger> = Signal::new();
+static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(State::Off));
 
 static RN: AtomicU32 = AtomicU32::new(0);
-static PAGE_RX: Channel<ThreadModeRawMutex, flash_::Page, ARQ_N> = Channel::new();
+static PAGE_RX: Channel<ThreadModeRawMutex, Page, ARQ_N> = Channel::new();
 
+static DONE: Signal<ThreadModeRawMutex, ()> = Signal::new();
 static READOUT_RN: Signal<ThreadModeRawMutex, u32> = Signal::new();
-static READOUT_PAGE: Watch<ThreadModeRawMutex, flash_::Page, 1> = Watch::new();
+static READOUT_PAGE: Watch<ThreadModeRawMutex, Page, 1> = Watch::new();
 
 #[embassy_executor::task]
 pub async fn task(mut r: Flash) {
-    let mut spi_config = spi::Config::default();
-    spi_config.bit_order = spi::BitOrder::MsbFirst;
-    spi_config.mode = spi::MODE_0;
-    spi_config.frequency = Hertz(12_000_000);
-    spi_config.gpio_speed = Speed::VeryHigh;
+    POWER_SIGNAL.turn_off();
 
-    let crc_config = crc::Config::new(
-        crc::InputReverseConfig::Byte,
-        true,
-        crc::PolySize::Width32,
-        0xffff_ffff,
-        0x04c1_1db7,
-    )
-    .unwrap();
-    let mut crc = Crc::new(r.crc, crc_config);
-
+    #[allow(clippy::never_loop)]
     loop {
-        TRIGGER.reset();
-        set_state(State::Idle);
+        set_state(State::Off);
+        POWER_SIGNAL.wait_for_on().await;
 
-        let trigger = TRIGGER.wait().await;
-        RESET.reset();
+        select(run(&mut r), POWER_SIGNAL.wait_for_off()).await;
+    }
+}
+
+async fn run(r: &mut Flash) {
+    loop {
+        set_state(State::Idle);
+        OPERATION.reset();
+        let trigger = OPERATION.wait().await;
+        DONE.reset();
 
         // Activate SPI
-        let mut _reset_n = Output::new(r.reset_n.reborrow(), Level::High, Speed::Low);
+        let mut _reset_n = OutputOpenDrain::new(r.reset_n.reborrow(), Level::High, Speed::Low);
         let cs_n = OutputOpenDrain::new(r.cs_n.reborrow(), Level::High, Speed::Low);
         let flash = spiflash::SpiFlash::init(
             Spi::new(
@@ -105,7 +104,25 @@ pub async fn task(mut r: Flash) {
                 r.miso.reborrow(),
                 r.dma_tx.reborrow(),
                 r.dma_rx.reborrow(),
-                spi_config,
+                Irqs,
+                #[cfg(not(feature = "nucleo"))]
+                {
+                    let mut c = spi::Config::default();
+                    c.bit_order = spi::BitOrder::MsbFirst;
+                    c.mode = spi::MODE_3;
+                    c.frequency = Hertz(1_000_000);
+                    c.gpio_speed = Speed::VeryHigh;
+                    c
+                },
+                #[cfg(feature = "nucleo")]
+                {
+                    let mut c = spi::Config::default();
+                    c.bit_order = spi::BitOrder::MsbFirst;
+                    c.mode = spi::MODE_0;
+                    c.frequency = Hertz(12_000_000);
+                    c.gpio_speed = Speed::VeryHigh;
+                    c
+                },
             ),
             cs_n,
         )
@@ -116,7 +133,20 @@ pub async fn task(mut r: Flash) {
             continue;
         };
 
-        select(trigger.handle(&mut flash, &mut crc), RESET.wait()).await;
+        let mut crc = Crc::new(
+            r.crc.reborrow(),
+            crc::Config::new(
+                crc::InputReverseConfig::Byte,
+                true,
+                crc::PolySize::Width32,
+                0xffff_ffff,
+                0x04c1_1db7,
+            )
+            .unwrap(),
+        );
+
+        trigger.handle(&mut flash, &mut crc).await;
+        DONE.signal(());
 
         // Deactivate SPI
         drop(flash); // dropping SPI calls set_as_disconnected() on all pins
@@ -179,7 +209,6 @@ async fn flash_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>
         }
     }
 
-    DONE.signal(());
     Ok(())
 }
 
@@ -197,7 +226,7 @@ async fn readout_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'
         }
 
         if last_page_loaded.is_none_or(|pg| pg != req_num) {
-            let mut page = flash_::Page::default()
+            let mut page = Page::default()
                 .init_page_number(req_num)
                 .init_data(heapless::Vec::from_array([0; PAGE_SIZE as usize]));
 
@@ -216,27 +245,27 @@ async fn readout_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'
 
     READOUT_PAGE.sender().clear();
 
-    DONE.signal(());
     Ok(())
 }
 
 fn compute_crc(page_number: u32, data: &[u8], crc: &mut Crc<'_>) -> u32 {
     crc.reset();
-    let _ = crc.feed_bytes(&page_number.to_le_bytes());
-    crc.feed_bytes(data) ^ 0xffff_ffff
+    crc.feed_bytes(&page_number.to_le_bytes());
+    crc.feed_bytes(data);
+    crc.read() ^ 0xffff_ffff
 }
 
-pub fn get_status() -> flash_::Status {
-    let mut s = flash_::Status::default();
+pub fn get_status() -> Status {
+    let mut s = Status::default();
 
     let state = get_state();
     s.set_state(state);
 
     match state {
-        flash_::State::Programming => {
+        State::Programming => {
             s.set_stm_page_request(RN.load(Ordering::Acquire));
         }
-        flash_::State::Readout => {
+        State::Readout => {
             if let Some(pg) = READOUT_PAGE.try_get() {
                 s.set_readout_page(pg);
             }
@@ -247,36 +276,39 @@ pub fn get_status() -> flash_::Status {
     s
 }
 
-pub fn accept_page(page: flash_::Page) {
-    let _ = PAGE_RX.try_send(page);
+pub fn handle_command(mut command: Command) {
+    if let Some(action) = command.take_action() {
+        match action {
+            Action::Program => OPERATION.signal(Trigger::Flash),
+            Action::Readout => OPERATION.signal(Trigger::Readout),
+            _ => (),
+        }
+    }
+    if let Some(page) = command.take_page() {
+        let _ = PAGE_RX.try_send(page);
+    }
+
+    if let Some(host_pg_req) = command.take_host_page_request() {
+        READOUT_RN.signal(host_pg_req);
+    }
 }
 
-pub fn set_readout_req_number(host_pg_req: u32) {
-    READOUT_RN.signal(host_pg_req);
-}
-
-fn get_state() -> flash_::State {
+pub fn get_state() -> State {
     STATE.lock(Cell::get)
 }
 
-fn set_state(state: flash_::State) {
+fn set_state(state: State) {
     STATE.lock(|s| s.set(state));
 }
 
-pub fn start() {
-    DONE.reset();
-    TRIGGER.signal(Trigger::Flash);
+pub(super) fn turn_on() {
+    POWER_SIGNAL.turn_on(());
 }
 
-pub fn start_readout() {
-    DONE.reset();
-    TRIGGER.signal(Trigger::Readout);
+pub(super) fn turn_off() {
+    POWER_SIGNAL.turn_off();
 }
 
-pub fn reset() {
-    RESET.signal(());
-}
-
-pub fn is_done() -> bool {
-    DONE.try_take().is_some()
+pub(super) fn is_off() -> bool {
+    get_state() == State::Off
 }

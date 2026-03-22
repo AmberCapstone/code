@@ -1,4 +1,4 @@
-use proto::sensor::flash::Segment;
+use proto::sensor::fpga::flash::Segment;
 
 pub const PAGE_SIZE: usize = 0x100;
 pub const SUBSECTOR_SIZE: usize = 0x1000;
