@@ -1,0 +1,22 @@
+[package]
+name = "sensor-server"
+description = "Exclusively manage communication to the sensor. Exposes connections for other apps to hook into."
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+amber-connect = { version = "0.1.0", path = "../../lib/rust/amber-connect" }
+bytes = "1.11.1"
+cobs = "0.5.1"
+futures = "0.3.32"
+prost = "0.14.3"
+proto = { version = "0.1.0", path = "../../lib/rust/proto" }
+serial = { version = "0.1.0", path = "../../lib/rust/serial" }
+serialport = { version = "4.9.0", features = ["usbportinfo-interface"] }
+tokio = { version = "1.50.0", features = ["rt"] }
+tokio-serial = { version = "5.4.5", features = ["codec", "rt"] }
+tokio-util = { version = "0.7.18", features = ["codec"] }
+zeromq = "0.5.0"
+
+[lints]
+workspace = true

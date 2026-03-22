@@ -1,10 +1,16 @@
 [workspace]
 resolver = "3"
-members = ["apps/capture","apps/dashboard/backend",
+members = [
+    "apps/sensor-server",
+    "apps/capture",
+    "apps/client-tui",
+    "apps/dashboard/backend",
     "apps/flasher",
-    "lib/rust/flash-layout", "lib/rust/influx",
+    "lib/rust/amber-connect",
+    "lib/rust/flash-layout",
+    "lib/rust/influx",
     "lib/rust/proto",
-    "lib/rust/serial",
+    "lib/rust/serial-sync", "lib/rust/serial",
 ]
 
 [workspace.lints.clippy]

@@ -1,104 +1,70 @@
-use serialport::SerialPortBuilder;
-use std::{
-    io::{BufRead, BufReader, BufWriter, Write},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-        mpsc,
-    },
-    thread::{self, JoinHandle},
-    time::Duration,
+mod codec;
+
+use futures::{SinkExt, stream::StreamExt};
+use tokio::sync::mpsc;
+use tokio_serial::SerialPortBuilderExt;
+use tokio_util::{
+    codec::{FramedRead, FramedWrite},
+    sync::CancellationToken,
 };
 
-pub struct Connection<Tx: prost::Message + Default, Rx: prost::Message + Default> {
+use codec::{RxCodec, TxCodec};
+
+/// # Errors
+///
+/// If serial port cannot be opened
+pub fn start<Tx, Rx>(
+    port: &str,
+    mut outgoing: mpsc::Receiver<Tx>,
     incoming: mpsc::Sender<Rx>,
-    outgoing: mpsc::Receiver<Tx>,
-    tx_interval: Duration,
-
-    stop: Arc<AtomicBool>,
-}
-
-impl<Tx, Rx> Connection<Tx, Rx>
+    stop: CancellationToken,
+) -> Result<(), tokio_serial::Error>
 where
     Tx: prost::Message + Default + 'static,
     Rx: prost::Message + Default + 'static,
 {
-    #[must_use]
-    pub fn new(out_rx: mpsc::Receiver<Tx>, in_tx: mpsc::Sender<Rx>) -> Self {
-        Self {
-            incoming: in_tx,
-            outgoing: out_rx,
-            tx_interval: Duration::from_millis(100),
-            stop: AtomicBool::new(false).into(),
+    let port = tokio_serial::new(port, 9600).open_native_async()?;
+
+    let (port_read, port_write) = tokio::io::split(port);
+
+    let mut reader = FramedRead::new(port_read, RxCodec::<Rx>::default());
+    let mut writer = FramedWrite::new(port_write, TxCodec::<Tx>::default());
+
+    let stop_read = stop.clone();
+    let stop_write = stop;
+
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                result = reader.next() => {
+                    match result {
+                        Some(Ok(msg)) => if incoming.send(msg).await.is_err() {
+                            stop_read.cancel();
+                        }
+                        Some(Err(e)) => eprintln!("read error {e}"),
+                        None => break, // port closed
+                    }
+                }
+                () = stop_read.cancelled() => { break; }
+            }
         }
-    }
+    });
 
-    #[must_use]
-    pub fn with_tx_interval(mut self, tx_interval: Duration) -> Self {
-        self.tx_interval = tx_interval;
-        self
-    }
-
-    #[must_use]
-    pub fn get_stop_signal(&self) -> Arc<AtomicBool> {
-        self.stop.clone()
-    }
-
-    pub fn start(self, ser: SerialPortBuilder) -> Result<(JoinHandle<()>, JoinHandle<()>), serialport::Error> {
-        let port = ser.open()?;
-        let port_tx = port.try_clone()?;
-        let stop_tx = self.get_stop_signal();
-
-        let mut reader = BufReader::new(port);
-        let mut writer = BufWriter::new(port_tx);
-
-        // Reader thread
-        let j1 = thread::spawn(move || {
-            while !self.stop.load(Ordering::Acquire) {
-                let mut buf = Vec::new();
-
-                if let Err(e) = reader.read_until(0x00, &mut buf) {
-                    eprintln!("Read error {e:?}");
-                    break;
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                command = outgoing.recv() => {
+                    match command {
+                        Some(command) => if writer.send(command).await.is_err() {
+                            stop_write.cancel();
+                        }
+                        None => break, // port closed
+                    }
                 }
-
-                let Ok(len) = cobs::decode_in_place(&mut buf) else {
-                    continue;
-                };
-
-                if let Ok(rx) = Rx::decode(&buf[..len]) {
-                    self.incoming.send(rx).unwrap();
-                }
+                () = stop_write.cancelled() => { break; }
             }
+        }
+    });
 
-            self.stop.store(true, Ordering::Relaxed);
-        });
-
-        let j2 = thread::spawn(move || {
-            let mut current_msg: Vec<u8> = Vec::new();
-
-            while !stop_tx.load(Ordering::Acquire) {
-                if let Ok(v) = self.outgoing.try_recv() {
-                    let proto_buf = v.encode_to_vec();
-                    current_msg = cobs::encode_vec(&proto_buf);
-                    current_msg.push(0x00); // must manually terminate
-                }
-
-                if let Err(e) = writer.write(&current_msg) {
-                    eprintln!("Write error {e:?}");
-                    break;
-                }
-                if let Err(e) = writer.flush() {
-                    eprintln!("Flush error {e:?}");
-                    break;
-                }
-
-                thread::sleep(self.tx_interval);
-            }
-
-            stop_tx.store(true, Ordering::Relaxed);
-        });
-
-        Ok((j1, j2))
-    }
+    Ok(())
 }
