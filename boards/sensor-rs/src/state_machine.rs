@@ -25,15 +25,9 @@ enum NormalState {
 static NORMAL_STATE: ChangeSignal<NormalState> = ChangeSignal::new(NormalState::Monitor);
 static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(State::LowCharge));
 
-// struct CameraControl {}
-// struct FpgaControl {}
-
 #[embassy_executor::task]
 pub async fn task(r: resources::StateMachine) {
     let mut vbat_ok = ExtiInput::new(r.vbat_ok, r.vbat_exti, Pull::None, Irqs);
-
-    // let camera_control = CameraControl {};
-    // let fpga_control = FpgaControl {};
 
     loop {
         select(low_power_loop(), vbat_ok.wait_for_high()).await;

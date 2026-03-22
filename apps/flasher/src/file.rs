@@ -1,10 +1,6 @@
 use flash_layout::PAGE_SIZE;
-use proto::sensor::fpga::flash::Segment;
-use std::fs::File;
-use std::io::Read;
-use std::iter::Enumerate;
-use std::path::Path;
-use std::slice::ChunksExact;
+use proto::sensor::fpga::flash::{Page, Segment};
+use std::{fs::File, io::Read, iter::Enumerate, path::Path, slice::ChunksExact};
 
 pub struct FlashFile(Vec<u8>);
 
@@ -65,7 +61,7 @@ impl FlashFile {
 pub struct PageIter<'a>(Enumerate<ChunksExact<'a, u8>>);
 
 impl Iterator for PageIter<'_> {
-    type Item = proto::sensor::fpga::flash::Page;
+    type Item = Page;
 
     #[allow(clippy::cast_possible_truncation, reason = "pg_num is small")]
     fn next(&mut self) -> Option<Self::Item> {
@@ -77,7 +73,7 @@ impl Iterator for PageIter<'_> {
             digest.update(data);
             let crc = digest.finalize();
 
-            proto::sensor::fpga::flash::Page {
+            Page {
                 page_number: Some(pg_num as u32),
                 data: Some(data.to_vec()),
                 crc: Some(crc),

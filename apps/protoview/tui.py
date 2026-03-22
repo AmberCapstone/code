@@ -1,29 +1,20 @@
-import binascii
 import subprocess
 import threading
 import time
-from pathlib import Path
 
 import cobs
 import serial
 import serial.tools.list_ports
 from google.protobuf import json_format
-from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Button, Label, Pretty
-from textual_fspicker import FileOpen
+from textual.widgets import Label, Pretty
 
 if subprocess.call(["sh", "generate_proto.sh"]) != 0:
     exit(1)
 
-import sensor.fpga.flash_pb2 as flash
-from sensor_pb2 import Action, Command, State, Status
-
-PAGE_SIZE = 256
-NUM_PAGES = 16 * 16 * 2
-TOTAL_SIZE = PAGE_SIZE * NUM_PAGES
+from sensor_pb2 import Command, Status
 
 
 def lpf(old: float, new: float) -> float:
@@ -39,11 +30,6 @@ class TUI(App):
     d_command = reactive(dict())
     d_status = reactive(dict())
 
-    action: Action = Action.ACTION_NONE
-
-    flashing_bytes: bytes | None = None
-    request_number: int = -1
-    sequence_number: int = -1
     last_time: float = 0
     dev_status: Status = Status()
 
@@ -74,7 +60,7 @@ class TUI(App):
     def compose(self) -> ComposeResult:
         with Horizontal():
             with Vertical(classes="box"):
-                yield Label("...", id="flash-file")
+                yield Label("...", id="lab-speed")
                 yield Label("Command")
                 yield Pretty("command", id="lab-cmd")
             with Vertical(classes="box"):
@@ -107,16 +93,12 @@ class TUI(App):
         )
         self.last_write_time = t
 
-        command = Command(action=self.action)
-        label = self.query_exactly_one("#flash-file", Label)
-
-        text = f"Seq Num: {self.sequence_number}"
-
+        command = Command()
         self.send(command)
 
-        text += f"\n READ  {self.last_read_interval * 1000:8.2f} ms"
+        text = f"\n READ  {self.last_read_interval * 1000:8.2f} ms"
         text += f"\n WRITE {self.last_write_interval * 1000:8.2f} ms"
-        label.update(text)
+        self.query_exactly_one("#lab-speed", Label).update(text)
 
     def send(self, command: Command) -> None:
         b = cobs.Encode(command.SerializeToString())
@@ -127,7 +109,10 @@ class TUI(App):
         self.query_exactly_one("#lab-cmd", Pretty).update(value)
 
     def watch_d_status(self, value: dict) -> None:
-        self.query_exactly_one("#lab-sts", Pretty).update(value)
+        try:
+            self.query_exactly_one("#lab-sts", Pretty).update(value)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

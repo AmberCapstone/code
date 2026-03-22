@@ -36,15 +36,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (j1, j2) = ser.start(port)?;
 
-    fn wait_until(incoming: &mpsc::Receiver<Status>, done: impl Fn(Status) -> bool) {
-        loop {
-            let sts = incoming.recv().unwrap();
-            if done(sts) {
-                break;
-            }
-        }
-    }
-
     println!("Exiting manual mode");
     outgoing
         .send({
@@ -80,7 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .unwrap();
 
-    let mut img_buf = [0u8; (NUM_LINES * BYTE_PER_LINE) as usize];
+    let mut img_buf: Vec<u8> = Vec::with_capacity((NUM_LINES * BYTE_PER_LINE) as usize);
 
     let sty = ProgressStyle::with_template("{msg:<11} {bar:40.cyan/blue} {bytes}/{total_bytes} [{elapsed_precise}]")
         .unwrap()
@@ -97,9 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("WRONG LINE");
                     continue;
                 }
-                let start = (lineno * BYTE_PER_LINE) as usize;
-                let end = start + BYTE_PER_LINE as usize;
-                img_buf[start..end].copy_from_slice(&line.data);
+                img_buf.extend_from_slice(&line.data);
 
                 break 'wait;
             }
@@ -129,9 +118,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let res = image::save_buffer(path, &img_buf, BYTE_PER_LINE, NUM_LINES, image::ColorType::L8);
 
     match res {
-        Ok(_) => println!("Saved to {}", path.display()),
+        Ok(()) => println!("Saved to {}", path.display()),
         Err(e) => println!("Failed to save image {e}"),
     }
 
     Ok(())
+}
+
+fn wait_until(incoming: &mpsc::Receiver<Status>, done: impl Fn(Status) -> bool) {
+    loop {
+        let sts = incoming.recv().unwrap();
+        if done(sts) {
+            break;
+        }
+    }
 }
