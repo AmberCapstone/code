@@ -10,7 +10,7 @@
 
 #include <cstdint>
 
-#include "periph/pin/digital.hpp"
+#include "periph/digital.hpp"
 
 #ifdef STM32F7
 #include "stm32f7xx_hal.h"
@@ -26,7 +26,7 @@ namespace amber::periph {
 struct Spi {
 
     Spi(SPI_HandleTypeDef& hspi, amber::periph::DigitalOutput& csPin)
-        : _hspi(hspi), _csPort(csPort), _csPin(csPin) {}
+        : _hspi(hspi), _csPin(csPin) {}
 
     ~Spi() = default;
 

@@ -86,14 +86,14 @@ typedef struct {
 
 struct Driver {
 
-    Driver(const periph::Spi&, const Config&);
+    Driver(periph::Spi&, const Config&);
     ~Driver() = default;
 
     auto init() noexcept -> Status;
     auto softReset() noexcept -> Status;
 
     auto setEnable(const bool amp1, const bool amp2, const bool dsa) noexcept -> Status;
-    auto setStateConfig(const ttSelect state, const StateConfig& cfg) noexcept -> Status;
+    auto setStateConfig(const AttSelect state, const StateConfig& cfg) noexcept -> Status;
     auto setDsaAttn(const AttSelect state, const uint8_t attn) noexcept -> Status;
 
     auto readActiveState() noexcept -> StateConfig;
@@ -120,7 +120,7 @@ private:
     static constexpr uint8_t SOFTRESET_VAL = 0x81;
     static constexpr uint8_t FOUR_WIRE_SPI = 0x18;
 
-    const periph::Spi& _spi;
+    periph::Spi& _spi;
     const Config _config;
 
     bool _nvmLoaded {false};

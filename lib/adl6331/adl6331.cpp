@@ -2,7 +2,7 @@
 
 namespace amber::adl6331 {
 
-Driver::Driver(const periph::Spi& spi, const Config& config)
+Driver::Driver(periph::Spi& spi, const Config& config)
     : _spi(spi), _config(config) {}
 
 auto Driver::init() noexcept -> Status {

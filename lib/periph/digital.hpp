@@ -10,6 +10,15 @@
 
 #include <cstdint>
 
+#ifdef STM32F7
+#include "stm32f7xx_hal.h"
+#elif STM32G0
+#include "stm32g0xx_hal.h"
+
+#endif
+
+#ifdef HAL_GPIO_MODULE_ENABLED
+
 namespace amber::periph {
 
 struct DigitalInput {
@@ -49,3 +58,5 @@ private:
 };
 
 }  // namespace amber::periph
+
+#endif  // HAL_GPIO_MODULE_ENABLED
