@@ -12,7 +12,6 @@ futures = "0.3.32"
 prost = "0.14.3"
 proto = { version = "0.1.0", path = "../../lib/rust/proto" }
 serial = { version = "0.1.0", path = "../../lib/rust/serial" }
-serialport = { version = "4.9.0", features = ["usbportinfo-interface"] }
 tokio = { version = "1.50.0", features = ["rt"] }
 tokio-serial = { version = "5.4.5", features = ["codec", "rt"] }
 tokio-util = { version = "0.7.18", features = ["codec"] }

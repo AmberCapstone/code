@@ -2669,7 +2669,6 @@ dependencies = [
  "prost",
  "proto",
  "serial",
- "serialport",
  "tokio",
  "tokio-serial",
  "tokio-util",

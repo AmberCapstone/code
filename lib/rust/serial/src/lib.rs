@@ -1,8 +1,10 @@
 mod codec;
 
+use std::io;
+
 use futures::{SinkExt, stream::StreamExt};
 use tokio::sync::mpsc;
-use tokio_serial::SerialPortBuilderExt;
+use tokio_serial::{SerialPortBuilderExt, SerialPortInfo, SerialPortType};
 use tokio_util::{
     codec::{FramedRead, FramedWrite},
     sync::CancellationToken,
@@ -67,4 +69,20 @@ where
     });
 
     Ok(())
+}
+
+/// # Errors
+///
+/// Fails to enumerature the system serial ports
+pub fn get_sensor_ports() -> Result<Vec<SerialPortInfo>, io::Error> {
+    Ok(tokio_serial::available_ports()?
+        .into_iter()
+        .filter(|p| {
+            matches!(&p.port_type,
+            SerialPortType::UsbPort(info) if
+                info.manufacturer.as_deref() == Some("amber")
+                    && info.product.as_deref() == Some("Sensor Board")
+            )
+        })
+        .collect())
 }
