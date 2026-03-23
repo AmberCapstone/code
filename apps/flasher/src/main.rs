@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (outgoing, outgoing_rx) = mpsc::channel::<Command>();
     let (incoming_tx, incoming) = mpsc::channel::<Status>();
 
-    let ser = serial::Connection::new(outgoing_rx, incoming_tx).with_tx_interval(Duration::from_millis(10));
+    let ser = serial_sync::Connection::new(outgoing_rx, incoming_tx).with_tx_interval(Duration::from_millis(10));
     let stop_signal = ser.get_stop_signal();
 
     let (j1, j2) = ser.start(port)?;

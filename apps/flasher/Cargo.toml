@@ -12,7 +12,7 @@ flash-layout = { version = "0.1.0", path = "../../lib/rust/flash-layout" }
 indicatif = "0.18.4"
 prost = "0.14.3"
 proto = { version = "0.1.0", path = "../../lib/rust/proto" }
-serial = { version = "0.1.0", path = "../../lib/rust/serial" }
+serial-sync = { version = "0.1.0", path = "../../lib/rust/serial-sync" }
 serialport = { version = "4.8.1", features = ["usbportinfo-interface"] }
 
 [build-dependencies]
