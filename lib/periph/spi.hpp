@@ -23,12 +23,12 @@
 
 namespace amber::periph {
 
-struct SPI {
+struct Spi {
 
-    SPI(SPI_HandleTypeDef& hspi, amber::periph::DigitalOutput& csPin)
+    Spi(SPI_HandleTypeDef& hspi, amber::periph::DigitalOutput& csPin)
         : _hspi(hspi), _csPort(csPort), _csPin(csPin) {}
 
-    ~SPI() = default;
+    ~Spi() = default;
 
     auto transmit(const uint8_t* data, uint16_t len) noexcept -> HAL_StatusTypeDef {
         csAssert();
