@@ -11,6 +11,8 @@ cobs = "0.5.1"
 futures = "0.3.32"
 prost = "0.14.3"
 proto = { version = "0.1.0", path = "../../lib/rust/proto" }
+rand = "0.10.0"
+serde = "1.0.228"
 serial = { version = "0.1.0", path = "../../lib/rust/serial" }
 tokio = { version = "1.50.0", features = ["rt"] }
 tokio-serial = { version = "5.4.5", features = ["codec", "rt"] }

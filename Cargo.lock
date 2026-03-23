@@ -39,7 +39,14 @@ dependencies = [
 name = "amber-connect"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "prost",
+ "proto",
+ "rand 0.10.0",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
  "zeromq",
 ]
 
@@ -2668,6 +2675,8 @@ dependencies = [
  "futures",
  "prost",
  "proto",
+ "rand 0.10.0",
+ "serde",
  "serial",
  "tokio",
  "tokio-serial",
