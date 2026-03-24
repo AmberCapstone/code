@@ -10,7 +10,7 @@ members = [
     "lib/rust/flash-layout",
     "lib/rust/influx",
     "lib/rust/proto",
-    "lib/rust/serial-sync", "lib/rust/serial",
+    "lib/rust/serial",
 ]
 
 [workspace.lints.clippy]
