@@ -1,5 +1,6 @@
 use std::time::SystemTime;
 
+use thiserror::Error;
 use zeromq::{ReqSocket, Socket, ZmqError};
 
 use super::{
@@ -105,34 +106,26 @@ impl Client {
     }
 }
 
+#[derive(Debug, Error)]
 pub enum ClientError {
-    LeaseHeld(LeaseHeld),
-    WrongToken(WrongToken),
-    Socket(JsonSocketError),
+    #[error(transparent)]
+    LeaseHeld(#[from] LeaseHeld),
+
+    #[error(transparent)]
+    WrongToken(#[from] WrongToken),
+
+    #[error("socket error {0}")]
+    Socket(#[from] JsonSocketError),
+
+    #[error("the server responded incorrectly")]
     WrongResponse,
+
+    #[error("the client's request was misformed")]
     InvalidRequest,
-}
-
-impl From<JsonSocketError> for ClientError {
-    fn from(value: JsonSocketError) -> Self {
-        Self::Socket(value)
-    }
-}
-
-impl From<LeaseHeld> for ClientError {
-    fn from(value: LeaseHeld) -> Self {
-        Self::LeaseHeld(value)
-    }
-}
-
-impl From<WrongToken> for ClientError {
-    fn from(value: WrongToken) -> Self {
-        Self::WrongToken(value)
-    }
 }
 
 impl From<ZmqError> for ClientError {
     fn from(value: ZmqError) -> Self {
-        Self::Socket(JsonSocketError::Zmq(value))
+        Self::Socket(JsonSocketError::Socket(value))
     }
 }

@@ -49,7 +49,7 @@ pub async fn run(
                         }
                     },
                     Err(JsonSocketError::EmptyFrame | JsonSocketError::Serde(_)) => Response::InvalidRequest,
-                    Err(JsonSocketError::Zmq(z)) => {
+                    Err(JsonSocketError::Socket(z)) => {
                         eprintln!("ZMQ error: {z:?}");
                         Response::InvalidRequest
                     }

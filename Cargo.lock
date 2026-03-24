@@ -45,6 +45,7 @@ dependencies = [
  "rand 0.10.0",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-util",
  "zeromq",
@@ -425,6 +426,7 @@ checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 name = "capture"
 version = "0.1.0"
 dependencies = [
+ "amber-connect",
  "clap",
  "cobs",
  "crc",
@@ -435,6 +437,8 @@ dependencies = [
  "proto",
  "serial-sync",
  "serialport",
+ "tokio",
+ "zeromq",
 ]
 
 [[package]]

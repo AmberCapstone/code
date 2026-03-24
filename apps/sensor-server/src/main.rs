@@ -1,10 +1,12 @@
-use amber_connect::{codec::ZmqMsgSender, control};
+use amber_connect::{codec::PbSender, control};
 use proto::sensor::{Command, Status};
 
 use std::{error::Error, time::Duration};
 use tokio::{select, sync::mpsc};
 use tokio_util::sync::CancellationToken;
 use zeromq::{PubSocket, Socket};
+
+const LEASE_DURATION: Duration = Duration::from_secs(60);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -26,7 +28,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let stop_control = stop.clone();
     let j2 = tokio::spawn(async move {
-        let _r = control::server::run(command_tx, Duration::from_secs(10), stop_control.clone()).await;
+        let _r = control::server::run(command_tx, LEASE_DURATION, stop_control.clone()).await;
         stop_control.cancel();
     });
 

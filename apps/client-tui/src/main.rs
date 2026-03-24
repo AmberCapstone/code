@@ -1,4 +1,4 @@
-use amber_connect::{self, codec::ZmqMsgReceiver};
+use amber_connect::{self, codec::PbReceiver};
 use proto::sensor::Status;
 use std::error::Error;
 use tokio::select;

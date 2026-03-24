@@ -4,6 +4,7 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
+use thiserror::Error;
 
 pub struct Lease {
     token_lifetime: Duration,
@@ -90,8 +91,10 @@ impl Token {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Error)]
+#[error("lease is already held")]
 pub struct LeaseHeld;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Error)]
+#[error("this token does not match the lease")]
 pub struct WrongToken;
