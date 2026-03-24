@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use thiserror::Error;
 use zeromq::{ReqSocket, Socket, ZmqError};
@@ -70,6 +70,25 @@ impl Client {
 
         let resp = self.socket.recv_json::<Response>().await?;
         extract_response!(resp, Response::Send, r => r.map_err(Into::into))
+    }
+
+    /// Repeatedly send a message at some interval.
+    ///
+    /// Useful with `tokio::select` to send a command until some condition is met
+    ///
+    /// # Errors
+    ///
+    /// Socket error on send or receive.
+    /// Client does not hold lease
+    /// Invalid JSON
+    /// Unexpected response
+    pub async fn send_continuous(&mut self, command: Command, interval: Duration) -> Result<(), ClientError> {
+        let mut ticker = tokio::time::interval(interval);
+
+        loop {
+            self.send(command.clone()).await?;
+            ticker.tick().await;
+        }
     }
 
     /// # Errors
