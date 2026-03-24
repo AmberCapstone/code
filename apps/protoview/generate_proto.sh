@@ -1,1 +1,0 @@
-protoc -I ../../proto --python_out=. --pyi_out=. sensor.proto sensor/alerts.proto sensor/camera.proto sensor/fpga.proto sensor/fpga/flash.proto sensor/fpga/image.proto sensor/measure.proto sensor/parameters.proto

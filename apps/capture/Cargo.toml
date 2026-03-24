@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+amber-connect = { version = "0.1.0", path = "../../lib/rust/amber-connect" }
+anyhow = "1.0.102"
 clap = { version = "4.5.60", features = ["derive"] }
 cobs = "0.5.1"
 crc = "3.4.0"
@@ -11,8 +13,9 @@ image = "0.25.10"
 indicatif = "0.18.4"
 prost = "0.14.3"
 proto = { version = "0.1.0", path = "../../lib/rust/proto" }
-serial-sync = { version = "0.1.0", path = "../../lib/rust/serial-sync" }
 serialport = { version = "4.8.1", features = ["usbportinfo-interface"] }
+tokio = { version = "1.50.0", features = ["rt", "sync"] }
+zeromq = "0.5.0"
 
 [build-dependencies]
 prost-build = "0.14.3"
