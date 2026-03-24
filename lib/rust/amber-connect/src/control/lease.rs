@@ -3,7 +3,10 @@ use rand::{
     rngs::{StdRng, SysRng},
 };
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, SystemTime};
+use std::{
+    fmt::Display,
+    time::{Duration, SystemTime},
+};
 use thiserror::Error;
 
 pub struct Lease {
@@ -28,16 +31,20 @@ impl Lease {
 
     pub fn acquire(&mut self) -> Result<(Token, SystemTime), LeaseHeld> {
         self.update_expiry();
-        if matches!(self.state, State::Available) {
-            let new_token = Token::new(&mut self.rng);
-            let expiry = SystemTime::now() + self.token_lifetime;
-            self.state = State::Held {
-                token: new_token,
+        match self.state {
+            State::Available => {
+                let new_token = Token::new(&mut self.rng);
+                let expiry = SystemTime::now() + self.token_lifetime;
+                self.state = State::Held {
+                    token: new_token,
+                    expiry,
+                };
+                Ok((new_token, expiry))
+            }
+            State::Held {
+                token: _, // Do not share this!
                 expiry,
-            };
-            Ok((new_token, expiry))
-        } else {
-            Err(LeaseHeld)
+            } => Err(LeaseHeld::with_expiry(expiry)),
         }
     }
 
@@ -92,8 +99,25 @@ impl Token {
 }
 
 #[derive(Debug, Serialize, Deserialize, Error)]
-#[error("lease is already held")]
-pub struct LeaseHeld;
+pub struct LeaseHeld {
+    pub expiry: SystemTime,
+}
+
+impl LeaseHeld {
+    fn with_expiry(expiry: SystemTime) -> Self {
+        Self { expiry }
+    }
+}
+
+impl Display for LeaseHeld {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let sec_until = match self.expiry.duration_since(SystemTime::now()) {
+            Ok(d) => d.as_secs_f32(),
+            Err(negative_d) => -negative_d.duration().as_secs_f32(),
+        };
+        write!(f, "lease is already held. expires in {sec_until:.2} seconds")
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Error)]
 #[error("this token does not match the lease")]
