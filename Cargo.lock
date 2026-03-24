@@ -427,6 +427,7 @@ name = "capture"
 version = "0.1.0"
 dependencies = [
  "amber-connect",
+ "anyhow",
  "clap",
  "cobs",
  "crc",
@@ -886,6 +887,8 @@ dependencies = [
 name = "flasher"
 version = "0.1.0"
 dependencies = [
+ "amber-connect",
+ "anyhow",
  "clap",
  "cobs",
  "crc",
@@ -896,6 +899,8 @@ dependencies = [
  "proto",
  "serial-sync",
  "serialport",
+ "tokio",
+ "zeromq",
 ]
 
 [[package]]

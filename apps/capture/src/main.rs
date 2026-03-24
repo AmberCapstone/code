@@ -2,6 +2,7 @@ use amber_connect::{
     codec::{PbReceiver, PbSocketError},
     control,
 };
+use anyhow::anyhow;
 use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use proto::sensor::{
@@ -21,26 +22,36 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
-
+async fn main() -> anyhow::Result<()> {
     let mut status_socket = SubSocket::new();
     status_socket.connect(amber_connect::endpoint::STATUS).await?;
     status_socket.subscribe("").await?;
 
     let mut control = control::Client::try_acquire().await?;
 
-    println!("Resetting...");
+    let r = tokio::select! {
+        r = capture(&mut control, &mut status_socket) => r,
+        _ = tokio::signal::ctrl_c() => Err(anyhow!("Interrupted"))
+    };
+
+    control.release().await;
+    r
+}
+
+async fn capture(control: &mut control::Client, status_socket: &mut SubSocket) -> anyhow::Result<()> {
+    let args = Args::parse();
+
+    println!("Resetting");
     let mut cmd = Command::default();
     cmd.set_action(Action::Monitor);
     control.send(cmd).await?;
-    wait_until(&mut status_socket, |s| s.state() != sensor::State::Manual).await?;
+    wait_until(status_socket, |s| s.state() != sensor::State::Manual).await?;
 
     println!("Starting Capture");
     let mut cmd = Command::default();
     cmd.set_action(Action::Manual);
     control.send(cmd).await?;
-    wait_until(&mut status_socket, |s| s.state() == sensor::State::Manual).await?;
+    wait_until(status_socket, |s| s.state() == sensor::State::Manual).await?;
 
     let cmd = Command {
         fpga: Some({
@@ -84,9 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     cmd.set_action(Action::Monitor);
     control.send(cmd).await?;
 
-    wait_until(&mut status_socket, |s| s.state() != sensor::State::Manual).await?;
-
-    control.release().await;
+    wait_until(status_socket, |s| s.state() != sensor::State::Manual).await?;
 
     let path = Path::new("image.png");
     let res = image::save_buffer(path, &img_buf, BYTE_PER_LINE, NUM_LINES, image::ColorType::L8);

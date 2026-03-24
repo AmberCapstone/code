@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 amber-connect = { version = "0.1.0", path = "../../lib/rust/amber-connect" }
+anyhow = "1.0.102"
 clap = { version = "4.5.60", features = ["derive"] }
 cobs = "0.5.1"
 crc = "3.4.0"
