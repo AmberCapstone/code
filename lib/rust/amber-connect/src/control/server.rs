@@ -38,7 +38,7 @@ pub async fn run(
                     Ok(Request::Acquire) => {
                         Response::Acquire(lease.acquire().map(|(token, expiry)| AcquireResponse { token, expiry }))
                     }
-                    Ok(Request::Release { token }) => Response::Release(lease.release(token)),
+                    Ok(Request::Release { token }) => Response::Release(lease.withdraw(token)),
                     Ok(Request::Renew{ token }) => Response::Renew(lease.renew(token)),
                     Ok(Request::Send { token, item }) => {
                         if lease.is_owned_by(token) {
