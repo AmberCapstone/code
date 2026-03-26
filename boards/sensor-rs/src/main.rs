@@ -13,6 +13,7 @@ mod clock;
 mod debug_led;
 mod flow;
 mod fpga;
+mod nvm;
 mod power;
 mod resources;
 mod sensors;

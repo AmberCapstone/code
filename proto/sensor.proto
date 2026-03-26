@@ -37,6 +37,7 @@ message Status {
     optional camera.Status camera = 5;
 
     // Diagnostics
+    optional string name = 13;
     optional uint32 tx_counter = 14;
     optional uint32 rx_counter = 15;
 }

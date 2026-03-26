@@ -1,5 +1,8 @@
 use amber_connect::{codec::PbSender, control};
+use clap::Parser;
 use proto::sensor::{Command, Status};
+use tokio_serial::UsbPortInfo;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use std::{error::Error, time::Duration};
 use tokio::{select, sync::mpsc};
@@ -8,12 +11,25 @@ use zeromq::{PubSocket, Socket};
 
 const LEASE_DURATION: Duration = Duration::from_secs(60);
 
+#[derive(Parser)]
+struct Args {
+    #[arg(short, action=clap::ArgAction::Count)]
+    verbose: u8,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let amber_ports = serial::get_sensor_ports().unwrap();
-    let Some(port) = amber_ports.first() else {
-        return Err("No amber Sensor Boards detected".into());
+    let args = Args::parse();
+    let filter = match args.verbose {
+        0 => "info",
+        1 => "debug",
+        _ => "trace",
     };
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(filter))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
     let (command_tx, command_rx) = mpsc::channel::<Command>(100);
     let (status_tx, mut status_rx) = mpsc::channel::<Status>(100);
@@ -24,7 +40,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     status_socket.bind(amber_connect::endpoint::STATUS).await?;
 
     let stop_serial = stop.clone();
-    let j1 = tokio::spawn(serial::run(port.port_name.clone(), command_rx, status_tx, stop_serial));
+    let j1 = tokio::spawn(serial::run(is_sensor_board, command_rx, status_tx, stop_serial));
 
     let stop_control = stop.clone();
     let j2 = tokio::spawn(async move {
@@ -49,10 +65,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     });
 
     tokio::signal::ctrl_c().await.unwrap();
-    println!("Stopping");
+    tracing::info!("Stopping server");
     stop.cancel();
 
     let _ = tokio::join!(j1, j2, j3);
 
     Ok(())
+}
+
+fn is_sensor_board(info: &UsbPortInfo) -> bool {
+    info.manufacturer.as_deref() == Some("amber") && info.product.as_deref() == Some("Sensor Board")
 }
