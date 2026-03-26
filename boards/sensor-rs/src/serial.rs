@@ -11,7 +11,7 @@ use embassy_usb::{
 };
 use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 
-use crate::{camera, fpga, proto, resources, sensors, state_machine};
+use crate::{camera, fpga, nvm, proto, resources, sensors, state_machine};
 
 const PACKET_SIZE: u16 = 64;
 
@@ -84,6 +84,7 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
     loop {
         let state = STATE.lock().await.clone();
         let status = proto::sensor_::Status::default()
+            .init_name(nvm::get_name())
             .init_rx_counter(state.rx_counter)
             .init_tx_counter(state.tx_counter)
             .init_state(state_machine::get_state())

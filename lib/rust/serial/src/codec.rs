@@ -20,12 +20,16 @@ impl<Rx: prost::Message + Default> Decoder for RxCodec<Rx> {
             let mut data = src.split_to(n + 1);
 
             if let Ok(len) = cobs::decode_in_place(&mut data) {
-                match Rx::decode(&data[..len]) {
-                    Ok(msg) => Ok(Some(msg)),
-                    Err(_) => Err(io::Error::other("Invalid PROTO")),
+                if let Ok(msg) = Rx::decode(&data[..len]) {
+                    tracing::trace!("decoded a valid message");
+                    Ok(Some(msg))
+                } else {
+                    tracing::warn!("dropping message - invalid protobuf");
+                    Ok(None)
                 }
             } else {
-                Err(io::Error::other("Invalid COBS"))
+                tracing::warn!("dropping message - invalid COBS");
+                Ok(None)
             }
         } else {
             Ok(None)
