@@ -38,10 +38,12 @@ impl Client {
     /// Client could not obtain lease
     /// Invalid JSON
     /// Unexpected response
-    pub async fn try_acquire() -> Result<Self, ClientError> {
+    pub async fn try_acquire(name: &str) -> Result<Self, ClientError> {
         let mut socket = ReqSocket::new();
         socket.connect(endpoint::COMMAND).await?;
-        socket.send_json::<Req>(&Request::Acquire).await?;
+        socket
+            .send_json::<Req>(&Request::Acquire { name: name.to_string() })
+            .await?;
 
         let resp = socket.recv_json::<Response>().await?;
         extract_response!(resp, Response::Acquire, acq => match acq {

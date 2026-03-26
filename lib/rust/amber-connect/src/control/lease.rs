@@ -17,7 +17,14 @@ pub struct Lease {
 
 enum State {
     Available,
-    Held { token: Token, expiry: SystemTime },
+    Held(Hold),
+}
+
+#[derive(Debug, Clone)]
+pub struct Hold {
+    pub token: Token,
+    pub expiry: SystemTime,
+    pub owner: String,
 }
 
 impl Lease {
@@ -42,22 +49,30 @@ impl Lease {
     /// # Errors
     ///
     /// `LeaseHeld` if the lease is held by an unexpired token.
-    pub fn acquire(&mut self) -> Result<(Token, SystemTime), LeaseHeld> {
-        self.update_expiry();
-        match self.state {
+    pub fn acquire(&mut self, process: &str) -> Result<Hold, LeaseHeld> {
+        tracing::debug!(by = process, "lease requested");
+        self.check_expiry();
+        match &self.state {
             State::Available => {
                 let new_token = Token::new(&mut self.rng);
                 let expiry = SystemTime::now() + self.token_lifetime;
-                self.state = State::Held {
+                let hold = Hold {
                     token: new_token,
                     expiry,
+                    owner: process.to_string(),
                 };
-                Ok((new_token, expiry))
+                self.state = State::Held(hold.clone());
+                tracing::info!(
+                    owner = process,
+                    remaining_s = self.token_lifetime.as_secs(),
+                    "lease acquired"
+                );
+                Ok(hold)
             }
-            State::Held {
-                token: _, // Do not share this!
-                expiry,
-            } => Err(LeaseHeld::with_expiry(expiry)),
+            State::Held(hold) => {
+                tracing::info!(to = process, "lease declined");
+                Err(LeaseHeld::with_expiry(hold.expiry))
+            }
         }
     }
 
@@ -66,17 +81,21 @@ impl Lease {
     /// # Errors
     ///
     /// `WrongToken` if this token does not hold the lease.
-    pub fn renew(&mut self, token: Token) -> Result<SystemTime, WrongToken> {
-        self.update_expiry();
-        if self.is_owned_by(token) {
-            let new_expiry = SystemTime::now() + self.token_lifetime;
-            self.state = State::Held {
-                token,
-                expiry: new_expiry,
-            };
-            Ok(new_expiry)
-        } else {
-            Err(WrongToken)
+    pub fn renew(&mut self, token: Token) -> Result<Hold, WrongToken> {
+        self.check_expiry();
+        match &mut self.state {
+            State::Held(hold) if hold.token == token => {
+                let new_expiry = SystemTime::now() + self.token_lifetime;
+                hold.expiry = new_expiry;
+
+                tracing::info!(
+                    owner = hold.owner,
+                    remaining_s = self.token_lifetime.as_secs(),
+                    "lease renewed"
+                );
+                Ok(hold.clone())
+            }
+            _ => Err(WrongToken),
         }
     }
 
@@ -89,27 +108,30 @@ impl Lease {
     ///
     /// `WrongToken` if this token does not hold the lease.
     pub fn withdraw(&mut self, token: Token) -> Result<(), WrongToken> {
-        self.update_expiry();
-        if self.is_owned_by(token) {
-            self.state = State::Available;
-            Ok(())
-        } else {
-            Err(WrongToken)
+        self.check_expiry();
+        match &mut self.state {
+            State::Held(hold) if hold.token == token => {
+                tracing::info!(by = hold.owner, "lease withdrawn");
+                self.state = State::Available;
+                Ok(())
+            }
+            _ => Err(WrongToken),
         }
     }
 
-    pub fn is_owned_by(&mut self, token_: Token) -> bool {
-        self.update_expiry();
-        match self.state {
-            State::Held { token: t, expiry: _ } => t == token_,
+    pub fn is_owned_by(&mut self, token: Token) -> bool {
+        self.check_expiry();
+        match &self.state {
+            State::Held(hold) => hold.token == token,
             State::Available => false,
         }
     }
 
-    fn update_expiry(&mut self) {
-        if let State::Held { token: _, expiry } = self.state
-            && SystemTime::now() > expiry
+    fn check_expiry(&mut self) {
+        if let State::Held(hold) = &self.state
+            && SystemTime::now() > hold.expiry
         {
+            tracing::info!(previous_owner = hold.owner, "lease expired");
             self.state = State::Available;
         }
     }
@@ -137,11 +159,8 @@ impl LeaseHeld {
 
 impl Display for LeaseHeld {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let sec_until = match self.expiry.duration_since(SystemTime::now()) {
-            Ok(d) => d.as_secs_f32(),
-            Err(negative_d) => -negative_d.duration().as_secs_f32(),
-        };
-        write!(f, "lease is already held. expires in {sec_until:.2} seconds")
+        let sec_until = self.expiry.duration_since(SystemTime::now()).map_or(0, |d| d.as_secs());
+        write!(f, "lease is already held. expires in {sec_until}s")
     }
 }
 
@@ -151,7 +170,7 @@ pub struct WrongToken;
 
 #[cfg(test)]
 mod tests {
-    use std::{arch::x86_64::_MM_EXCEPT_INVALID, thread::sleep};
+    use std::thread::sleep;
 
     use super::*;
 
@@ -161,16 +180,16 @@ mod tests {
     fn test_renew() {
         let mut lease = Lease::new(LIFETIME);
 
-        let (token, mut expiry) = lease.acquire().expect("lease is available");
+        let h = lease.acquire("test").expect("lease is available");
 
         for _ in 0..5 {
             sleep(LIFETIME * 10 / 11);
-            expiry = lease.renew(token).expect("lease has not expired");
+            lease.renew(h.token).expect("lease has not expired");
         }
 
         sleep(LIFETIME * 11 / 10);
-        assert!(lease.renew(token).is_err(), "lease has expired");
-        assert!(lease.withdraw(token).is_err(), "cannot release an unowned lease");
+        assert!(lease.renew(h.token).is_err(), "lease has expired");
+        assert!(lease.withdraw(h.token).is_err(), "cannot release an unowned lease");
     }
 
     #[test]
@@ -180,9 +199,9 @@ mod tests {
         let wrong_token = Token(0);
         assert!(!lease.is_owned_by(wrong_token));
 
-        let (token, _) = lease.acquire().expect("lease is available");
-        assert!(lease.is_owned_by(token));
-        lease.withdraw(token).expect("token owns the lease");
-        assert!(!lease.is_owned_by(token));
+        let h = lease.acquire("test").expect("lease is available");
+        assert!(lease.is_owned_by(h.token));
+        lease.withdraw(h.token).expect("token owns the lease");
+        assert!(!lease.is_owned_by(h.token));
     }
 }

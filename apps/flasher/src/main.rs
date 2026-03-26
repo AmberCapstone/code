@@ -19,6 +19,7 @@ use std::{
     thread,
     time::{Duration, SystemTime},
 };
+use tokio::time::timeout;
 use zeromq::{Socket, SubSocket};
 
 mod file;
@@ -36,13 +37,14 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut control = control::Client::try_acquire().await?;
+    let args = Args::parse();
+
+    let mut control = control::Client::try_acquire("flasher").await?;
 
     let mut status_socket = SubSocket::new();
     status_socket.connect(amber_connect::endpoint::STATUS).await?;
     status_socket.subscribe("").await?;
 
-    let args = Args::parse();
     let file = FlashFile::new(&args.file, args.segment.into(), PAD_BYTE)?;
 
     let r = tokio::select! {
@@ -58,7 +60,11 @@ async fn flash(file: FlashFile, control: &mut control::Client, status_socket: &m
     println!("Resetting");
     let mut cmd = Command::default();
     cmd.set_action(Action::Monitor);
-    command_until(cmd, |s| s.state() != sensor::State::Manual, control, status_socket).await?;
+    timeout(
+        Duration::from_secs(2),
+        command_until(cmd, |s| s.state() != sensor::State::Manual, control, status_socket),
+    )
+    .await??;
 
     println!("Entering manual mode");
     let mut cmd = Command::default();

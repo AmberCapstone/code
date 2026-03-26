@@ -1,11 +1,11 @@
 use std::time::SystemTime;
 
-use super::lease::{LeaseHeld, Token, WrongToken};
+use super::lease::{Hold, LeaseHeld, Token, WrongToken};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub enum Request<T> {
-    Acquire,
+    Acquire { name: String },
     Release { token: Token },
     Renew { token: Token },
     Send { token: Token, item: T },
@@ -24,4 +24,13 @@ pub enum Response {
 pub struct AcquireResponse {
     pub token: Token,
     pub expiry: SystemTime,
+}
+
+impl From<Hold> for AcquireResponse {
+    fn from(value: Hold) -> Self {
+        Self {
+            token: value.token,
+            expiry: value.expiry,
+        }
+    }
 }
