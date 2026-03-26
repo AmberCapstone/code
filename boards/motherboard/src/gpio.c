@@ -40,18 +40,29 @@ void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(DEBUG_GPIO_Port, DEBUG_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF, P6V_SCATTER_PWR_EN_Pin|P6V_SCATTER_HSD_DIAG_EN_Pin|VGA_PWR_EN_Pin|VCO_PWR_EN_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : DEBUG_Pin */
-  GPIO_InitStruct.Pin = DEBUG_Pin;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOE, DEBUG_Pin|GEN_EN_Pin|LPA_PWR_EN_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : P6V_SCATTER_PWR_EN_Pin P6V_SCATTER_HSD_DIAG_EN_Pin VGA_PWR_EN_Pin VCO_PWR_EN_Pin */
+  GPIO_InitStruct.Pin = P6V_SCATTER_PWR_EN_Pin|P6V_SCATTER_HSD_DIAG_EN_Pin|VGA_PWR_EN_Pin|VCO_PWR_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(DEBUG_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : DEBUG_Pin GEN_EN_Pin LPA_PWR_EN_Pin */
+  GPIO_InitStruct.Pin = DEBUG_Pin|GEN_EN_Pin|LPA_PWR_EN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
 }
 

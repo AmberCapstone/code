@@ -57,8 +57,20 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define P6V_SCATTER_PWR_EN_Pin GPIO_PIN_0
+#define P6V_SCATTER_PWR_EN_GPIO_Port GPIOF
+#define P6V_SCATTER_HSD_DIAG_EN_Pin GPIO_PIN_1
+#define P6V_SCATTER_HSD_DIAG_EN_GPIO_Port GPIOF
 #define DEBUG_Pin GPIO_PIN_7
 #define DEBUG_GPIO_Port GPIOE
+#define VGA_PWR_EN_Pin GPIO_PIN_11
+#define VGA_PWR_EN_GPIO_Port GPIOF
+#define VCO_PWR_EN_Pin GPIO_PIN_12
+#define VCO_PWR_EN_GPIO_Port GPIOF
+#define GEN_EN_Pin GPIO_PIN_0
+#define GEN_EN_GPIO_Port GPIOE
+#define LPA_PWR_EN_Pin GPIO_PIN_1
+#define LPA_PWR_EN_GPIO_Port GPIOE
 
 /* USER CODE BEGIN Private defines */
 

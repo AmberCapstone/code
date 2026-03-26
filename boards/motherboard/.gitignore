@@ -13,3 +13,5 @@ Middlewares/
 .project
 .cproject
 .mxproject
+.osx.project
+.settings/
