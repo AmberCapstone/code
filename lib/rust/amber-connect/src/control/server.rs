@@ -7,7 +7,7 @@ use zeromq::{RepSocket, Socket, ZmqResult};
 
 use super::{
     lease::{Lease, WrongToken},
-    messages::{AcquireResponse, Request, Response},
+    messages::{Request, Response},
 };
 use crate::{
     codec::{JsonReceiver, JsonSender, JsonSocketError},
@@ -35,11 +35,11 @@ pub async fn run(
         tokio::select! {
             request = socket.recv_json::<Request<Command>>() => {
                 let response: Response = match request {
-                    Ok(Request::Acquire) => {
-                        Response::Acquire(lease.acquire().map(|(token, expiry)| AcquireResponse { token, expiry }))
+                    Ok(Request::Acquire{ name }) => {
+                        Response::Acquire(lease.acquire(&name).map(Into::into))
                     }
                     Ok(Request::Release { token }) => Response::Release(lease.withdraw(token)),
-                    Ok(Request::Renew{ token }) => Response::Renew(lease.renew(token)),
+                    Ok(Request::Renew{ token }) => Response::Renew(lease.renew(token).map(|h| h.expiry)),
                     Ok(Request::Send { token, item }) => {
                         if lease.is_owned_by(token) {
                             commands_tx.send(item).await.expect("channel is alive");

@@ -13,6 +13,7 @@ serde_json = "1.0.149"
 thiserror = "2.0.18"
 tokio = { version = "1.50.0", features = ["sync"] }
 tokio-util = "0.7.18"
+tracing = "0.1.44"
 zeromq = { version = "0.5.0", default-features = false, features = ["tokio-runtime"] }
 
 [lints]

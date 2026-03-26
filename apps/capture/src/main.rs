@@ -9,7 +9,8 @@ use proto::sensor::{
     self, Action, Command, Status,
     fpga::{self, CaptureSource},
 };
-use std::path::Path;
+use std::{path::Path, time::Duration};
+use tokio::time::timeout;
 use zeromq::{Socket, SubSocket};
 
 const NUM_LINES: u32 = 240;
@@ -23,14 +24,16 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+
     let mut status_socket = SubSocket::new();
     status_socket.connect(amber_connect::endpoint::STATUS).await?;
     status_socket.subscribe("").await?;
 
-    let mut control = control::Client::try_acquire().await?;
+    let mut control = control::Client::try_acquire("capture").await?;
 
     let r = tokio::select! {
-        r = capture(&mut control, &mut status_socket) => r,
+        r = capture(args, &mut control, &mut status_socket) => r,
         _ = tokio::signal::ctrl_c() => Err(anyhow!("Interrupted"))
     };
 
@@ -38,14 +41,16 @@ async fn main() -> anyhow::Result<()> {
     r
 }
 
-async fn capture(control: &mut control::Client, status_socket: &mut SubSocket) -> anyhow::Result<()> {
-    let args = Args::parse();
-
+async fn capture(args: Args, control: &mut control::Client, status_socket: &mut SubSocket) -> anyhow::Result<()> {
     println!("Resetting");
     let mut cmd = Command::default();
     cmd.set_action(Action::Monitor);
     control.send(cmd).await?;
-    wait_until(status_socket, |s| s.state() != sensor::State::Manual).await?;
+    timeout(
+        Duration::from_secs(1),
+        wait_until(status_socket, |s| s.state() != sensor::State::Manual),
+    )
+    .await??;
 
     println!("Starting Capture");
     let mut cmd = Command::default();
