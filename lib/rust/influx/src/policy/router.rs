@@ -2,28 +2,36 @@ use globset::{Glob, GlobMatcher};
 
 use super::LogPolicy;
 
+#[derive(Debug, Clone)]
 pub struct PolicyRouter {
     rules: Vec<(GlobMatcher, LogPolicy)>,
-    default: LogPolicy,
+    default_policy: LogPolicy,
 }
 
 impl PolicyRouter {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             rules: Vec::new(),
-            default: LogPolicy::default(),
+            default_policy: LogPolicy::default(),
         }
     }
 
     /// Set the policy applied to keys which match no rules
+    #[must_use]
     pub fn with_default(mut self, default_policy: LogPolicy) -> Self {
-        self.default = default_policy;
+        self.default_policy = default_policy;
         self
     }
 
     /// Set a specific `policy` for keys matching glob `pattern`
     ///
     /// The first matching policy will be selected when a key matches multiple patterns.
+    ///
+    /// # Panics
+    ///
+    /// `pattern` is not a valid glob pattern
+    #[must_use]
     pub fn rule(mut self, pattern: &str, policy: LogPolicy) -> Self {
         // glob considers `[` and `]` special characters, but json arrays get flattened to
         // `arr[0], arr[1], ...`. Escape brackets for ease of use.
@@ -37,7 +45,13 @@ impl PolicyRouter {
         self.rules
             .iter()
             .find(|(pattern, _)| pattern.is_match(key))
-            .map_or(&self.default, |(_, policy)| policy)
+            .map_or(&self.default_policy, |(_, policy)| policy)
+    }
+}
+
+impl Default for PolicyRouter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -59,29 +73,29 @@ mod tests {
             .rule("child[0].*", LogPolicy::EveryMeasurement)
             .rule("child*.*", LogPolicy::after_interval(Duration::from_millis(2000)));
 
-        assert!(matches!(*router.policy_for("not_a_match"), LogPolicy::EveryMeasurement));
+        assert!(matches!(router.policy_for("not_a_match"), LogPolicy::EveryMeasurement));
         assert!(matches!(
-            *router.policy_for("sensors.important"),
+            router.policy_for("sensors.important"),
             LogPolicy::AfterInterval(_)
         ));
         assert!(matches!(
-            *router.policy_for("sensors.not_important"),
+            router.policy_for("sensors.not_important"),
             LogPolicy::OnChange(_)
         ));
         assert!(
-            matches!(*router.policy_for("child[0].state"), LogPolicy::OnChange(_)),
+            matches!(router.policy_for("child[0].state"), LogPolicy::OnChange(_)),
             "`state` has a separate rule"
         );
         assert!(matches!(
-            *router.policy_for("child[0].data"),
+            router.policy_for("child[0].data"),
             LogPolicy::EveryMeasurement
         ));
         assert!(
-            matches!(*router.policy_for("child[1].state"), LogPolicy::OnChange(_)),
+            matches!(router.policy_for("child[1].state"), LogPolicy::OnChange(_)),
             "`state` has a separate rule"
         );
         assert!(matches!(
-            *router.policy_for("child[1].data"),
+            router.policy_for("child[1].data"),
             LogPolicy::AfterInterval(_)
         ));
     }

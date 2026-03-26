@@ -7,12 +7,13 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use influx::policy::{LogPolicy, PolicyRouter};
-use serde::Serialize;
-use std::{
-    net::SocketAddr,
-    time::{Instant, SystemTime},
+use influx::{
+    LogItem,
+    policy::{LogPolicy, PolicyRouter},
 };
+use proto::sensor::{self, Status};
+use serde::Serialize;
+use std::{net::SocketAddr, time::Instant};
 use tokio::{
     sync::mpsc,
     time::{Duration, interval},
@@ -21,14 +22,14 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Serialize, Debug)]
-struct SensorData {
+struct MockSensorData {
     battery: f32,
     state: FwState,
-    power: Power,
+    power_mw: PowerMw,
 }
 
 #[derive(Serialize, Debug)]
-struct Power {
+struct PowerMw {
     solar: f32,
     fpga: f32,
     camera: f32,
@@ -36,9 +37,12 @@ struct Power {
     antenna: f32,
 }
 
-impl Power {
+impl PowerMw {
     fn net(&self) -> f32 {
-        self.solar - (self.fpga + self.camera + self.mcu + self.antenna)
+        self.solar - self.out()
+    }
+    fn out(&self) -> f32 {
+        self.fpga + self.camera + self.mcu + self.antenna
     }
 }
 
@@ -51,45 +55,24 @@ enum FwState {
 }
 
 impl FwState {
-    #[allow(clippy::unused_self)]
-    fn solar(self) -> f32 {
-        9.0
-    }
-
-    fn fpga(self) -> f32 {
-        match self {
-            FwState::Capture => 5.0,
-            FwState::Process => 15.0,
-            _ => 0.0,
-        }
-    }
-
-    fn camera(self) -> f32 {
-        if self == Self::Capture { 60.0 } else { 0.0 }
-    }
-
-    fn mcu(self) -> f32 {
-        if self == Self::Transmit { 7.0 } else { 2.0 }
-    }
-
-    fn antenna(self) -> f32 {
-        if self == Self::Transmit { 5.0 } else { 0.0 }
-    }
-
-    fn power(self) -> Power {
-        Power {
-            solar: self.solar(),
-            fpga: self.fpga(),
-            camera: self.camera(),
-            mcu: self.mcu(),
-            antenna: self.antenna(),
+    fn power(self) -> PowerMw {
+        PowerMw {
+            solar: 9.0,
+            fpga: match self {
+                FwState::Capture => 5.0,
+                FwState::Process => 15.0,
+                _ => 0.0,
+            },
+            camera: if self == Self::Capture { 60.0 } else { 0.0 },
+            mcu: if self == Self::Transmit { 7.0 } else { 2.0 },
+            antenna: if self == Self::Transmit { 5.0 } else { 0.0 },
         }
     }
 }
 
 #[derive(Clone)]
 struct AppState {
-    tx: mpsc::Sender<(SensorData, SystemTime)>,
+    tx: mpsc::Sender<LogItem<Status>>,
 }
 
 async fn ws_handler(ws: WebSocketUpgrade, State(app_state): State<AppState>) -> impl IntoResponse {
@@ -143,10 +126,10 @@ async fn handle_socket(mut socket: WebSocket, app_state: AppState) {
 
         let power = fw_state.power();
         battery += power.net() * PERIOD.as_secs_f32() * 0.01;
-        let data = SensorData {
+        let data = MockSensorData {
             battery,
             state: fw_state,
-            power,
+            power_mw: power,
         };
         tracing::debug!(data=?data);
 
@@ -156,11 +139,8 @@ async fn handle_socket(mut socket: WebSocket, app_state: AppState) {
         }
 
         tracing::trace!("Sending measurement to Logger");
-        app_state
-            .tx
-            .send((data, SystemTime::now()))
-            .await
-            .expect("send to work");
+        let log_item = LogItem::new_now(data.into(), "mock").unwrap();
+        app_state.tx.send(log_item).await.expect("send to work");
         tracing::trace!("Sent measurement to Logger");
     }
 }
@@ -191,7 +171,9 @@ async fn main() {
                 .rule("state", LogPolicy::on_change(Duration::from_millis(500))),
         );
 
-    let app_state = AppState { tx: logger.sender() };
+    let (item_tx, item_rx) = mpsc::channel(50);
+
+    let app_state = AppState { tx: item_tx };
     let app = Router::new()
         .route("/ws", get(ws_handler))
         .with_state(app_state)
@@ -202,6 +184,57 @@ async fn main() {
 
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
 
-    let ((), r) = tokio::join!(logger.run(), axum::serve(listener, app));
+    let ((), r) = tokio::join!(logger.run(item_rx), axum::serve(listener, app));
     r.unwrap();
+}
+
+impl From<MockSensorData> for Status {
+    fn from(data: MockSensorData) -> Self {
+        let mut status = Status::default();
+        status.set_state(data.state.into());
+        status.fpga.get_or_insert_default().set_state(match data.state {
+            FwState::Capture => sensor::fpga::State::Booting,
+            FwState::Process => sensor::fpga::State::Running,
+            FwState::Charging | FwState::Transmit => sensor::fpga::State::Off,
+        });
+        status
+            .camera
+            .get_or_insert_default()
+            .set_state(if data.state == FwState::Capture {
+                sensor::camera::State::Running
+            } else {
+                sensor::camera::State::Off
+            });
+        status.measurement = Some(data.into());
+
+        status
+    }
+}
+
+impl From<FwState> for sensor::State {
+    fn from(value: FwState) -> Self {
+        match value {
+            FwState::Charging => Self::Charging,
+            FwState::Capture | FwState::Process | FwState::Transmit => Self::Capture,
+        }
+    }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "this is only for mocking"
+)]
+impl From<MockSensorData> for sensor::Measurement {
+    fn from(value: MockSensorData) -> Self {
+        const VDD: f32 = 3.3;
+        const UA_PER_MW: f32 = 1000.0 / VDD;
+        Self {
+            temperature_degc: 22,
+            vdd_mv: (VDD * 1000.0) as u32,
+            vbat_mv: (value.battery * 1000.0) as u32,
+            isense_ua: (value.power_mw.out() * UA_PER_MW) as u32,
+            fpga_isense_ua: (value.power_mw.fpga * UA_PER_MW) as u32,
+        }
+    }
 }

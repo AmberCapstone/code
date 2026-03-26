@@ -7,24 +7,29 @@ use crate::{LogPolicy, PolicyRouter};
 pub(crate) struct ValueRegistry {
     registry: HashMap<String, LogPolicy>,
     policy_router: PolicyRouter,
+    flattener: Flattener,
 }
 
 impl ValueRegistry {
     pub(crate) fn new(policy_router: PolicyRouter) -> Self {
-        Self {
-            registry: HashMap::new(),
-            policy_router,
-        }
-    }
-
-    pub(crate) fn update<T: serde::Serialize>(&mut self, values: T) -> Vec<(String, serde_json::Value)> {
-        let flat = Flattener::new()
+        let flattener = Flattener::new()
             .set_preserve_empty_objects(true)
             .set_preserve_empty_objects(true)
             .set_array_formatting(ArrayFormatting::Surrounded {
                 start: "[".to_string(),
                 end: "]".to_string(),
-            })
+            });
+
+        Self {
+            registry: HashMap::new(),
+            policy_router,
+            flattener,
+        }
+    }
+
+    pub(crate) fn update<T: serde::Serialize>(&mut self, values: T) -> Vec<(String, serde_json::Value)> {
+        let flat = self
+            .flattener
             .flatten(&serde_json::to_value(values).expect("serde doesn't fail"))
             .expect("no key collisions");
 
@@ -39,8 +44,8 @@ impl ValueRegistry {
                 .entry(key.clone())
                 .or_insert_with(|| self.policy_router.policy_for(key).clone());
 
-            if policy.should_log(val) {
-                points_to_write.push((key.clone(), val.clone()));
+            if let Some(to_log) = policy.update(val) {
+                points_to_write.push((key.clone(), to_log.clone()));
             }
         }
 

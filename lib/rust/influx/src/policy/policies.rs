@@ -6,22 +6,29 @@ pub enum LogPolicy {
     EveryMeasurement,
     AfterInterval(AfterInterval),
     OnChange(OnChange),
+    Never,
 }
 
 impl LogPolicy {
+    #[must_use]
     pub fn after_interval(interval: Duration) -> Self {
         Self::AfterInterval(AfterInterval::new(interval))
     }
 
+    #[must_use]
     pub fn on_change(timeout: Duration) -> Self {
         Self::OnChange(OnChange::new(timeout))
     }
 
-    pub fn should_log(&mut self, value: &serde_json::Value) -> bool {
+    /// Update the policy with a new value.
+    ///
+    /// Returns Some(value) if the policy is ready to log.
+    pub fn update(&mut self, value: &serde_json::Value) -> Option<serde_json::Value> {
         match self {
-            Self::EveryMeasurement => true,
-            Self::AfterInterval(after_interval) => after_interval.should_log(),
-            Self::OnChange(on_change) => on_change.should_log(value),
+            Self::EveryMeasurement => Some(value.clone()),
+            Self::AfterInterval(after_interval) => after_interval.update(value),
+            Self::OnChange(on_change) => on_change.update(value),
+            Self::Never => None,
         }
     }
 }
@@ -33,6 +40,7 @@ pub struct AfterInterval {
 }
 
 impl AfterInterval {
+    #[must_use]
     pub fn new(interval: Duration) -> Self {
         Self {
             interval,
@@ -40,14 +48,14 @@ impl AfterInterval {
         }
     }
 
-    fn should_log(&mut self) -> bool {
+    fn update(&mut self, value: &serde_json::Value) -> Option<serde_json::Value> {
         let out_of_date = self.last_time.is_none_or(|t| t.elapsed() >= self.interval);
 
         if out_of_date {
             self.last_time = Some(Instant::now());
-            true
+            Some(value.clone())
         } else {
-            false
+            None
         }
     }
 }
@@ -64,6 +72,7 @@ impl OnChange {
     /// changing and a value which stopped arriving.
     /// Specify a timeout to ensure the value is occasionally logged as long as it continues
     /// arriving.
+    #[must_use]
     pub fn new(timeout: Duration) -> Self {
         Self {
             last_value: None,
@@ -72,16 +81,16 @@ impl OnChange {
         }
     }
 
-    fn should_log(&mut self, value: &serde_json::Value) -> bool {
+    fn update(&mut self, value: &serde_json::Value) -> Option<serde_json::Value> {
         let changed = Some(value) != self.last_value.as_ref();
         let timed_out = self.last_time.is_none_or(|t| t.elapsed() >= self.timeout);
 
         if changed || timed_out {
             self.last_value = Some(value.clone());
             self.last_time = Some(Instant::now());
-            true
+            Some(value.clone())
         } else {
-            false
+            None
         }
     }
 }
