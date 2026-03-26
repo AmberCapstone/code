@@ -1,11 +1,12 @@
 [workspace]
 resolver = "3"
 members = [
-    "apps/sensor-server",
     "apps/capture",
     "apps/client-tui",
     "apps/dashboard/backend",
+    "apps/db-logger",
     "apps/flasher",
+    "apps/sensor-server",
     "lib/rust/amber-connect",
     "lib/rust/flash-layout",
     "lib/rust/influx",

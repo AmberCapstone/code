@@ -1,6 +1,10 @@
 use reqwest::Client;
-use std::time::SystemTime;
-use std::{path::Path, time::Duration};
+use serde::Serialize;
+use std::{
+    collections::HashMap,
+    time::{Duration, SystemTime},
+};
+use thiserror::Error;
 use tokio::sync::mpsc;
 
 pub mod policy;
@@ -24,35 +28,58 @@ pub struct InfluxConfig {
 
 pub enum Error {}
 
-pub struct Logger<'a, T: serde::Serialize> {
+pub struct Logger {
     db: InfluxConfig,
-    rx: mpsc::Receiver<(T, SystemTime)>,
-    tx: mpsc::Sender<(T, SystemTime)>,
 
-    backup_file: Option<&'a Path>,
     flush_interval: Duration,
     policies: PolicyRouter,
 }
 
-impl<'a, T: serde::Serialize> Logger<'a, T> {
-    #[must_use]
-    pub fn new(db: InfluxConfig) -> Self {
-        let (tx, rx) = mpsc::channel(50);
-        Self {
-            db,
-            rx,
-            tx,
+pub struct LogItem<T: Serialize> {
+    data: T,
+    at_time: SystemTime,
+    source: String,
+}
 
-            backup_file: None,
-            flush_interval: Duration::from_secs(1),
-            policies: PolicyRouter::new(),
+#[derive(Debug, Error)]
+pub enum LogItemError {
+    #[error("source string must be alphanumeric to be a valid tag")]
+    InvalidSource,
+}
+
+impl<T: Serialize> LogItem<T> {
+    /// # Errors
+    ///
+    /// `source` is not alphanumeric.
+    pub fn new(data: T, source: &str, at_time: SystemTime) -> Result<Self, LogItemError> {
+        if source.chars().all(char::is_alphanumeric) {
+            Ok(Self {
+                data,
+                at_time,
+                source: source.to_string(),
+            })
+        } else {
+            Err(LogItemError::InvalidSource)
         }
     }
 
+    /// # Errors
+    ///
+    /// See `LogItem::new()`
+    pub fn new_now(data: T, source: &str) -> Result<Self, LogItemError> {
+        Self::new(data, source, SystemTime::now())
+    }
+}
+
+impl Logger {
     #[must_use]
-    pub fn with_backup_file(mut self, backup_file: &'a Path) -> Self {
-        self.backup_file = Some(backup_file);
-        self
+    pub fn new(db: InfluxConfig) -> Self {
+        Self {
+            db,
+
+            flush_interval: Duration::from_secs(1),
+            policies: PolicyRouter::new(),
+        }
     }
 
     #[must_use]
@@ -67,25 +94,30 @@ impl<'a, T: serde::Serialize> Logger<'a, T> {
         self
     }
 
-    #[must_use]
-    pub fn sender(&self) -> mpsc::Sender<(T, SystemTime)> {
-        self.tx.clone()
-    }
-
-    pub fn run(mut self) -> impl Future<Output = ()> {
+    /// # Panics
+    ///
+    /// Panics if the item channel closes
+    pub fn run<T: Serialize>(self, mut item_rx: mpsc::Receiver<LogItem<T>>) -> impl Future<Output = ()> {
         tracing::info!("Running Logger");
         let (tx_line, mut rx_line) = mpsc::channel::<String>(500);
 
         let parser = async move {
             tracing::info!("Starting Logger Parser");
-            let mut registry = ValueRegistry::new(self.policies);
+            let mut registries = HashMap::<String, ValueRegistry>::new(); // Separate registry per source
 
             loop {
                 tracing::trace!("Waiting for a measurement");
-                let (measurement, time) = self.rx.recv().await.unwrap();
-                let fields_to_write = registry.update(measurement);
+                let item = item_rx.recv().await.unwrap();
+                let registry = registries
+                    .entry(item.source.clone())
+                    .or_insert_with(|| ValueRegistry::new(self.policies.clone()));
 
-                let line = line_protocol(&self.db.measurement, &self.db.tags, &fields_to_write, time);
+                let fields_to_write = registry.update(item.data);
+
+                let mut tags = self.db.tags.clone();
+                tags.push(format!("source={}", item.source));
+
+                let line = line_protocol(&self.db.measurement, &tags, &fields_to_write, item.at_time);
                 tracing::trace!(line = line, "Sending a line to the db writer");
                 tx_line.send(line).await.unwrap();
                 tracing::trace!("Sent a line to the db writer");

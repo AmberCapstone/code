@@ -324,6 +324,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "influx",
+ "proto",
  "rand 0.10.0",
  "reqwest",
  "serde",
@@ -728,6 +729,20 @@ name = "data-encoding"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
+
+[[package]]
+name = "db-logger"
+version = "0.1.0"
+dependencies = [
+ "amber-connect",
+ "anyhow",
+ "influx",
+ "proto",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "zeromq",
+]
 
 [[package]]
 name = "digest"
@@ -1495,6 +1510,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
@@ -2678,6 +2694,7 @@ version = "0.1.0"
 dependencies = [
  "amber-connect",
  "bytes",
+ "clap",
  "cobs",
  "futures",
  "prost",
@@ -2688,6 +2705,8 @@ dependencies = [
  "tokio",
  "tokio-serial",
  "tokio-util",
+ "tracing",
+ "tracing-subscriber",
  "zeromq",
 ]
 
@@ -2768,6 +2787,7 @@ dependencies = [
  "tokio",
  "tokio-serial",
  "tokio-util",
+ "tracing",
 ]
 
 [[package]]
