@@ -39,6 +39,9 @@ void MX_FREERTOS_Init() {
     vTaskStartScheduler();
 }
 
+/* static allocation is used for freeRTOS, so the application must
+provide an implementation of vApplicationGetIdleTaskMemory() to provide
+the memory that is used by the Idle task. */
 extern "C" {
 void vApplicationGetIdleTaskMemory(StaticTask_t** ppxIdleTaskTCBBuffer,
                                    StackType_t** ppxIdleTaskStackBuffer,
