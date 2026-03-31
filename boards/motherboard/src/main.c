@@ -19,6 +19,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "adc.h"
+#include "dac.h"
+#include "spi.h"
+#include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
 
@@ -89,6 +93,11 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_ADC1_Init();
+  MX_DAC1_Init();
+  MX_SPI2_Init();
+  MX_SPI3_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
     // HAL_GPIO_WritePin(VCO_PWR_EN_GPIO_Port, VCO_PWR_EN_Pin, GPIO_PIN_RESET);
     // HAL_GPIO_WritePin(VGA_PWR_EN_GPIO_Port, VGA_PWR_EN_Pin, GPIO_PIN_RESET);
