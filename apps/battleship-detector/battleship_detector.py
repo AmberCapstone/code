@@ -1115,20 +1115,22 @@ def save_comparison_figure(label: GridLabel,
                             out_path: str):
     """Save a grid comparison figure. >4 panels → 2 rows for readability."""
     n = len(panels)
-    if n <= 4:
-        nrows, ncols = 1, n
-    else:
-        ncols = (n + 1) // 2   # ceil(n/2) columns
-        nrows = 2
+    # if n <= 4:
+    #     nrows, ncols = 1, n
+    # else:
+    ncols = (n + 1) // 2   # ceil(n/2) columns
+    nrows = 2
 
     fig, axes = plt.subplots(nrows, ncols,
                              figsize=(4 * ncols, 3.5 * nrows),
-                             facecolor="#1a1a2e")
+                            #  facecolor="#1a1a2e")
+                             facecolor="#ff7701")
     # Flatten axes to a 1-D list and hide any unused slots
     ax_flat = np.array(axes).flatten()
     for i, (title, img_bgr) in enumerate(panels):
         ax_flat[i].imshow(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
-        ax_flat[i].set_title(title, color="white", fontsize=9, pad=4)
+        # ax_flat[i].set_title(title, color="white", fontsize=9, pad=4)
+        ax_flat[i].set_title(title, color="black", fontsize=20, pad=4)
         ax_flat[i].axis("off")
     for j in range(len(panels), len(ax_flat)):
         ax_flat[j].axis("off")
@@ -1213,13 +1215,13 @@ def evaluate(labels: List[GridLabel],
         m_sobel.update(tp, fp, fn, elapsed)
         panels.append(("Sobel", draw_detections(img, label, sobel_boxes, "Sobel")))
 
-        # --- Ensemble ---
-        t0 = time.perf_counter()
-        ens_boxes  = ensemble_bboxes(blob_boxes, sobel_boxes)
-        elapsed    = (time.perf_counter() - t0) * 1000
-        tp, fp, fn = match_detections(ens_boxes, gt_bboxes, iou_thresh)
-        m_ensemble.update(tp, fp, fn, elapsed)
-        panels.append(("Ensemble", draw_detections(img, label, ens_boxes, "Ensemble")))
+        # # --- Ensemble ---
+        # t0 = time.perf_counter()
+        # ens_boxes  = ensemble_bboxes(blob_boxes, sobel_boxes)
+        # elapsed    = (time.perf_counter() - t0) * 1000
+        # tp, fp, fn = match_detections(ens_boxes, gt_bboxes, iou_thresh)
+        # m_ensemble.update(tp, fp, fn, elapsed)
+        # panels.append(("Ensemble", draw_detections(img, label, ens_boxes, "Ensemble")))
 
         # --- Visualise first n_vis images ---
         if visualize and idx < n_vis:
@@ -1231,13 +1233,15 @@ def evaluate(labels: List[GridLabel],
     print("\n" + "="*72)
     print("DETECTION RESULTS")
     print("="*72)
-    for m in list(cnn_metrics.values()) + [m_blob, m_sobel, m_ensemble]:
+    # for m in list(cnn_metrics.values()) + [m_blob, m_sobel, m_ensemble]:
+    for m in list(cnn_metrics.values()) + [m_blob, m_sobel]:
         if m.n_images > 0:
             print(m)
     print("="*72)
 
     # --- Summary bar chart ---
-    active = [m for m in list(cnn_metrics.values()) + [m_blob, m_sobel, m_ensemble]
+    # active = [m for m in list(cnn_metrics.values()) + [m_blob, m_sobel, m_ensemble]
+    active = [m for m in list(cnn_metrics.values()) + [m_blob, m_sobel]
               if m.n_images > 0]
     names  = [m.name.split("(")[0].strip() for m in active]
     prec   = [m.precision for m in active]
@@ -1321,35 +1325,35 @@ def main():
             vl = val_labels or train_labels[int(0.8*len(train_labels)):]
             tl = train_labels[:int(0.8*len(train_labels))] if not val_labels else train_labels
 
-            # FCN-Small — load if weights exist, train only if missing or --train
-            if not os.path.exists(path_small):
-                print("\n── FCN-Small — training ───────────────────────────────────────")
-                small = FCNSmall().to(device)
-                pw    = compute_pos_weight(tl)
-                train_one_cnn(small, tl, vl, args.epochs, path_small, pw)
-                small.eval()
-            else:
-                print(f"Loading FCN-Small from {path_small}")
-                small = FCNSmall().to(device)
-                small.load_state_dict(torch.load(path_small, map_location=device,
-                                                 weights_only=True))
-                small.eval()
-            models["FCN-Small"] = small
+            # # FCN-Small — load if weights exist, train only if missing or --train
+            # if not os.path.exists(path_small):
+            #     print("\n── FCN-Small — training ───────────────────────────────────────")
+            #     small = FCNSmall().to(device)
+            #     pw    = compute_pos_weight(tl)
+            #     train_one_cnn(small, tl, vl, args.epochs, path_small, pw)
+            #     small.eval()
+            # else:
+            #     print(f"Loading FCN-Small from {path_small}")
+            #     small = FCNSmall().to(device)
+            #     small.load_state_dict(torch.load(path_small, map_location=device,
+            #                                      weights_only=True))
+            #     small.eval()
+            # models["FCN-Small"] = small
 
-            # FCN-Deep — load if weights exist, train only if missing or --train
-            if not os.path.exists(path_deep):
-                print("\n── FCN-Deep — training ────────────────────────────────────────")
-                deep = FCNDeep().to(device)
-                pw   = compute_pos_weight(tl)
-                train_one_cnn(deep, tl, vl, args.epochs, path_deep, pw)
-                deep.eval()
-            else:
-                print(f"Loading FCN-Deep  from {path_deep}")
-                deep = FCNDeep().to(device)
-                deep.load_state_dict(torch.load(path_deep, map_location=device,
-                                                weights_only=True))
-                deep.eval()
-            models["FCN-Deep"] = deep
+            # # FCN-Deep — load if weights exist, train only if missing or --train
+            # if not os.path.exists(path_deep):
+            #     print("\n── FCN-Deep — training ────────────────────────────────────────")
+            #     deep = FCNDeep().to(device)
+            #     pw   = compute_pos_weight(tl)
+            #     train_one_cnn(deep, tl, vl, args.epochs, path_deep, pw)
+            #     deep.eval()
+            # else:
+            #     print(f"Loading FCN-Deep  from {path_deep}")
+            #     deep = FCNDeep().to(device)
+            #     deep.load_state_dict(torch.load(path_deep, map_location=device,
+            #                                     weights_only=True))
+            #     deep.eval()
+            # models["FCN-Deep"] = deep
 
             # Tiny YOLO — load if weights exist, train only if missing or --train
             if not os.path.exists(path_yolo):

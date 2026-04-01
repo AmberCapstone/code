@@ -1,74 +1,75 @@
+import argparse
 import json
 import math
 import os
 import random
-from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
+from PIL import Image, ImageFilter, ImageEnhance
 
 # ============================================================================
-# Image / dataset settings
+# Defaults / settings
 # ============================================================================
 
-IMG_W, IMG_H = 160, 120 
+IMG_W, IMG_H = 160, 120
 
-NUM_IMAGES = 100000
+NUM_IMAGES = 10000
 TRAIN_SPLIT = 0.7
 VAL_SPLIT = 0.2
 TEST_SPLIT = 0.1
 DATASET_DIR = "dataset"
-OUTPUT_MODE = "luma" # luma or rgb
+OUTPUT_MODE = "luma"  # luma or rgb
 
 assert abs(TRAIN_SPLIT + VAL_SPLIT + TEST_SPLIT - 1.0) < 1e-9
-
-# ============================================================================
-# Grid settings
-# ============================================================================
-
-GRID_ROWS = 10
-GRID_COLS = 10
-
-# Base size of one cell in pixels. This is the main scale control.
-BASE_CELL_SIZE = 10
-
-# Small per-image scale jitter so the whole grid changes size slightly.
-CELL_SIZE_JITTER_PX = 2
-
-# Randomize the grid position around center.
-GRID_OFFSET_JITTER_X_PX = 4
-GRID_OFFSET_JITTER_Y_PX = 4
 
 # ============================================================================
 # Colors
 # ============================================================================
 
-BASE_GRID_LINE = (80, 80, 80)
 BASE_BG_COLOR = (90, 160, 220)
 
 # ============================================================================
 # Ship settings
 # ============================================================================
 
-SPRITE_DIR = "assets/ships"
-SHIP_SPECS = {
+BATTLESHIP_SPRITE_DIR = "assets/battleships"
+BATTLESHIP_SPRITE_SPECS = {
     "patrol.png": 2,
     "carrier.png": 2,
     "destroyer.png": 3,
     "battleship.png": 4,
 }
 
+NOTBATTLESHIP_SPRITE_DIR = "assets/notbattleships"
+NOTBATTLESHIP_SPRITE_SPECS = {
+    "pirate-ship-sprite.png": 4,
+    "coast-guard-sprite.png": 3,
+    "cargo-sprite-2.png": 6,
+    "cargo-boat-sprite.png": 5,
+}
+
+SPRITE_SETS = {
+    "battleship": {
+        "dir": BATTLESHIP_SPRITE_DIR,
+        "specs": BATTLESHIP_SPRITE_SPECS,
+    },
+    "notbattleship": {
+        "dir": NOTBATTLESHIP_SPRITE_DIR,
+        "specs": NOTBATTLESHIP_SPRITE_SPECS,
+    },
+}
+
 MIN_BOATS = 0
 MAX_BOATS = 4
-ROTATIONS = [0, 90, 180, 270]
+
+ROTATION_RANGE_DEG = (0.0, 360.0)
 
 # ============================================================================
 # Augmentation settings
 # ============================================================================
 
-DRAW_GRID_PROB = 0
-SHIP_BLUR_RADIUS_RANGE = (0.0, 1.2)
+SHIP_BLUR_RADIUS_RANGE = (0.6, 1.5)
 IMAGE_BLUR_RADIUS_RANGE = (0.0, 0.8)
-BG_BRIGHTNESS_RANGE = (0.94, 1.12)
+BG_BRIGHTNESS_RANGE = (0.75, 0.95)
 SHIP_BRIGHTNESS_RANGE = (0.85, 1.15)
-GRID_BRIGHTNESS_RANGE = (0.75, 1.25)
 
 SPRITE_SIZE_JITTER_PX = 10
 PASTE_OFFSET_JITTER_PX = 1
@@ -76,23 +77,40 @@ PASTE_OFFSET_JITTER_PX = 1
 SPRITE_PAD_X = 2
 SPRITE_PAD_Y = 2
 
+BASE_PIXELS_PER_CELL = 10
+PIXELS_PER_CELL_JITTER = 2
+
+PLACEMENT_MARGIN_PX = 1
+MAX_PLACEMENT_ATTEMPTS = 200
+
+# Ocean texture crop scaling
+OCEAN_TEXTURE_SCALE_RANGE = (1.0, 1.5)
+OCEAN_TEXTURE_BLUR_RANGE = (0.0, 0.6)
+
 # ============================================================================
-# Dataset directories
+# CLI
 # ============================================================================
 
-IMAGE_TRAIN_DIR = os.path.join(DATASET_DIR, "images", "train")
-IMAGE_VAL_DIR = os.path.join(DATASET_DIR, "images", "val")
-IMAGE_TEST_DIR = os.path.join(DATASET_DIR, "images", "test")
-
-LABEL_TRAIN_DIR = os.path.join(DATASET_DIR, "labels", "train")
-LABEL_VAL_DIR = os.path.join(DATASET_DIR, "labels", "val")
-LABEL_TEST_DIR = os.path.join(DATASET_DIR, "labels", "test")
-
-for d in [
-    IMAGE_TRAIN_DIR, IMAGE_VAL_DIR, IMAGE_TEST_DIR,
-    LABEL_TRAIN_DIR, LABEL_VAL_DIR, LABEL_TEST_DIR,
-]:
-    os.makedirs(d, exist_ok=True)
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate synthetic boat dataset.")
+    parser.add_argument(
+        "--boat-set",
+        choices=["battleship", "notbattleship"],
+        default="notbattleship",
+        help="Which sprite family to use.",
+    )
+    parser.add_argument(
+        "--background-mode",
+        choices=["color", "ocean-texture"],
+        default="color",
+        help="Background generation mode.",
+    )
+    parser.add_argument(
+        "--ocean-texture-path",
+        default="assets/backgrounds/ocean_texture.png",
+        help="Path to ocean texture image used when background-mode=ocean-texture.",
+    )
+    return parser.parse_args()
 
 # ============================================================================
 # Helpers
@@ -118,113 +136,12 @@ def get_split(idx, num_train, num_val):
     return "test"
 
 
-def choose_random_ship_name():
-    return random.choice(list(SHIP_SPECS.keys()))
-
-
-# ============================================================================
-# Geometry helpers
-# ============================================================================
-
-def compute_grid_geometry(img_w, img_h):
-    """
-    Compute grid placement and scale for a single image.
-
-    The grid is centered, then jittered slightly in x/y.
-    Cell size is jittered slightly to vary overall scale.
-    """
-    cell_size = BASE_CELL_SIZE + random.randint(-CELL_SIZE_JITTER_PX, CELL_SIZE_JITTER_PX)
-    cell_size = max(4, cell_size)
-
-    grid_w = GRID_COLS * cell_size
-    grid_h = GRID_ROWS * cell_size
-
-    # If image size changes and grid would not fit, automatically shrink it.
-    if grid_w > img_w or grid_h > img_h:
-        max_cell_w = img_w // GRID_COLS
-        max_cell_h = img_h // GRID_ROWS
-        cell_size = max(4, min(max_cell_w, max_cell_h))
-        grid_w = GRID_COLS * cell_size
-        grid_h = GRID_ROWS * cell_size
-
-    center_x0 = (img_w - grid_w) // 2
-    center_y0 = (img_h - grid_h) // 2
-
-    x_jitter = random.randint(-GRID_OFFSET_JITTER_X_PX, GRID_OFFSET_JITTER_X_PX)
-    y_jitter = random.randint(-GRID_OFFSET_JITTER_Y_PX, GRID_OFFSET_JITTER_Y_PX)
-
-    grid_x0 = center_x0 + x_jitter
-    grid_y0 = center_y0 + y_jitter
-
-    # Clamp so the whole grid remains visible
-    grid_x0 = max(0, min(grid_x0, img_w - grid_w))
-    grid_y0 = max(0, min(grid_y0, img_h - grid_h))
-
-    grid_x1 = grid_x0 + grid_w
-    grid_y1 = grid_y0 + grid_h
-
-    return {
-        "cell_size": cell_size,
-        "grid_w": grid_w,
-        "grid_h": grid_h,
-        "grid_x0": grid_x0,
-        "grid_y0": grid_y0,
-        "grid_x1": grid_x1,
-        "grid_y1": grid_y1,
-    }
-
-
-def occupied_cells_for_placement(top_r, left_c, ship_len, angle):
-    if angle in (0, 180):
-        return [(top_r + i, left_c) for i in range(ship_len)]
-    return [(top_r, left_c + i) for i in range(ship_len)]
-
-
-def placement_fits(cells, occupied):
-    for r, c in cells:
-        if not (0 <= r < GRID_ROWS and 0 <= c < GRID_COLS):
-            return False
-        if (r, c) in occupied:
-            return False
-    return True
-
-
-def find_valid_placements(ship_len, angle, occupied):
-    placements = []
-
-    if angle in (0, 180):
-        max_start_r = GRID_ROWS - ship_len
-        max_start_c = GRID_COLS - 1
-    else:
-        max_start_r = GRID_ROWS - 1
-        max_start_c = GRID_COLS - ship_len
-
-    for r in range(max_start_r + 1):
-        for c in range(max_start_c + 1):
-            cells = occupied_cells_for_placement(r, c, ship_len, angle)
-            if placement_fits(cells, occupied):
-                placements.append((r, c, cells))
-
-    return placements
-
-
-def cell_block_pixel_bbox(cells, grid_x0, grid_y0, cell_size):
-    rows = [r for r, _ in cells]
-    cols = [c for _, c in cells]
-
-    min_r, max_r = min(rows), max(rows)
-    min_c, max_c = min(cols), max(cols)
-
-    x0 = grid_x0 + min_c * cell_size
-    y0 = grid_y0 + min_r * cell_size
-    x1 = grid_x0 + (max_c + 1) * cell_size
-    y1 = grid_y0 + (max_r + 1) * cell_size
-
-    return [x0, y0, x1, y1]
-
+def choose_pixels_per_cell():
+    px = BASE_PIXELS_PER_CELL + random.randint(-PIXELS_PER_CELL_JITTER, PIXELS_PER_CELL_JITTER)
+    return max(4, px)
 
 # ============================================================================
-# Background texture
+# Background helpers
 # ============================================================================
 
 def add_ocean_gradient(img, max_delta=18):
@@ -251,7 +168,6 @@ def add_ocean_gradient(img, max_delta=18):
 
     grad.putdata(pixels)
     grad_rgb = Image.merge("RGB", (grad, grad, grad))
-
     return Image.blend(img, grad_rgb, alpha=0.12)
 
 
@@ -295,15 +211,76 @@ def add_background_texture(img):
     return img
 
 
+def load_ocean_texture(path):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Ocean texture not found: {path}")
+    return Image.open(path).convert("RGB")
+
+
+def random_resized_crop(img, out_w, out_h, min_scale=1.0, max_scale=1.4):
+    src_w, src_h = img.size
+
+    scale = random.uniform(min_scale, max_scale)
+    crop_w = max(out_w, int(out_w * scale))
+    crop_h = max(out_h, int(out_h * scale))
+
+    crop_w = min(crop_w, src_w)
+    crop_h = min(crop_h, src_h)
+
+    if crop_w < out_w or crop_h < out_h:
+        return img.resize((out_w, out_h), Image.LANCZOS)
+
+    max_x = src_w - crop_w
+    max_y = src_h - crop_h
+
+    x0 = random.randint(0, max_x) if max_x > 0 else 0
+    y0 = random.randint(0, max_y) if max_y > 0 else 0
+
+    crop = img.crop((x0, y0, x0 + crop_w, y0 + crop_h))
+    return crop.resize((out_w, out_h), Image.LANCZOS)
+
+
+def make_background(img_w, img_h, background_mode, ocean_texture=None):
+    if background_mode == "ocean-texture":
+        if ocean_texture is None:
+            raise ValueError("ocean_texture must be provided for ocean-texture mode")
+
+        bg = random_resized_crop(
+            ocean_texture,
+            img_w,
+            img_h,
+            min_scale=OCEAN_TEXTURE_SCALE_RANGE[0],
+            max_scale=OCEAN_TEXTURE_SCALE_RANGE[1],
+        )
+
+        bg_brightness = random.uniform(*BG_BRIGHTNESS_RANGE)
+        bg = ImageEnhance.Brightness(bg).enhance(bg_brightness)
+
+        blur_r = random.uniform(*OCEAN_TEXTURE_BLUR_RANGE)
+        if blur_r > 0.01:
+            bg = bg.filter(ImageFilter.GaussianBlur(radius=blur_r))
+
+        return bg
+
+    if background_mode == "color":
+        bg_brightness = random.uniform(*BG_BRIGHTNESS_RANGE)
+        bg_color = jitter_color(BASE_BG_COLOR, jitter=10, brightness_scale=bg_brightness)
+
+        bg = Image.new("RGB", (img_w, img_h), bg_color)
+        bg = add_background_texture(bg)
+        return bg
+
+    raise ValueError(f"Unsupported background mode: {background_mode}")
+
 # ============================================================================
 # Ship helpers
 # ============================================================================
 
-def resize_sprite_to_cells(path, ship_cells, cell_size):
+def resize_sprite_freeform(path, ship_cells, pixels_per_cell):
     sprite = Image.open(path).convert("RGBA")
 
-    target_w = cell_size - 2 * SPRITE_PAD_X
-    target_h = ship_cells * cell_size - 2 * SPRITE_PAD_Y
+    target_w = pixels_per_cell - 2 * SPRITE_PAD_X
+    target_h = ship_cells * pixels_per_cell - 2 * SPRITE_PAD_Y
 
     jitter_w = random.randint(0, SPRITE_SIZE_JITTER_PX)
     jitter_h = random.randint(0, SPRITE_SIZE_JITTER_PX)
@@ -326,72 +303,115 @@ def augment_ship(sprite):
     return sprite
 
 
-def paste_sprite_centered_on_cells(img, sprite, cells, grid_x0, grid_y0, cell_size):
-    x0, y0, x1, y1 = cell_block_pixel_bbox(cells, grid_x0, grid_y0, cell_size)
+def rotate_sprite(sprite, angle_deg):
+    return sprite.rotate(angle_deg, expand=True, resample=Image.BICUBIC)
 
-    block_cx = (x0 + x1) // 2
-    block_cy = (y0 + y1) // 2
 
-    sprite_w, sprite_h = sprite.size
-    paste_x = block_cx - sprite_w // 2 + random.randint(-PASTE_OFFSET_JITTER_PX, PASTE_OFFSET_JITTER_PX)
-    paste_y = block_cy - sprite_h // 2 + random.randint(-PASTE_OFFSET_JITTER_PX, PASTE_OFFSET_JITTER_PX)
+def bbox_intersects(a, b):
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    return not (ax1 <= bx0 or bx1 <= ax0 or ay1 <= by0 or by1 <= ay0)
 
+
+def bbox_inside_image(bbox, img_w, img_h, margin=0):
+    x0, y0, x1, y1 = bbox
+    return (
+        x0 >= margin and
+        y0 >= margin and
+        x1 <= img_w - margin and
+        y1 <= img_h - margin
+    )
+
+
+def choose_random_paste_xy(sprite_w, sprite_h, img_w, img_h, margin=0):
+    min_x = margin
+    min_y = margin
+    max_x = img_w - sprite_w - margin
+    max_y = img_h - sprite_h - margin
+
+    if max_x < min_x or max_y < min_y:
+        return None
+
+    x = random.randint(min_x, max_x)
+    y = random.randint(min_y, max_y)
+    return x, y
+
+
+def alpha_bbox_for_pasted_sprite(sprite, paste_x, paste_y):
+    alpha = sprite.getchannel("A")
+    bbox = alpha.getbbox()
+    if bbox is None:
+        return None
+
+    x0, y0, x1, y1 = bbox
+    return [paste_x + x0, paste_y + y0, paste_x + x1, paste_y + y1]
+
+
+def paste_sprite(img, sprite, paste_x, paste_y):
     img.alpha_composite(sprite, (paste_x, paste_y))
 
-    return [paste_x, paste_y, paste_x + sprite_w, paste_y + sprite_h]
 
+def place_one_random_ship(img, occupied_bboxes, annotations, boat_set):
+    sprite_dir = SPRITE_SETS[boat_set]["dir"]
+    sprite_specs = SPRITE_SETS[boat_set]["specs"]
 
-def place_one_random_ship(img, occupied, annotations, grid_x0, grid_y0, cell_size):
-    ship_name = choose_random_ship_name()
-    ship_len = SHIP_SPECS[ship_name]
+    ship_name = random.choice(list(sprite_specs.keys()))
+    ship_len = sprite_specs[ship_name]
+    sprite_path = os.path.join(sprite_dir, ship_name)
 
-    angles = ROTATIONS[:]
-    random.shuffle(angles)
+    for _ in range(MAX_PLACEMENT_ATTEMPTS):
+        pixels_per_cell = choose_pixels_per_cell()
 
-    valid_options = []
-    for angle in angles:
-        placements = find_valid_placements(ship_len, angle, occupied)
-        for start_r, start_c, cells in placements:
-            valid_options.append((angle, start_r, start_c, cells))
+        sprite = resize_sprite_freeform(sprite_path, ship_len, pixels_per_cell)
+        angle = random.uniform(*ROTATION_RANGE_DEG)
+        sprite = rotate_sprite(sprite, angle)
+        sprite = augment_ship(sprite)
 
-    if not valid_options:
-        return False
+        sprite_w, sprite_h = sprite.size
+        xy = choose_random_paste_xy(
+            sprite_w, sprite_h, img.width, img.height, margin=PLACEMENT_MARGIN_PX
+        )
+        if xy is None:
+            continue
 
-    angle, start_r, start_c, cells = random.choice(valid_options)
+        paste_x, paste_y = xy
+        paste_x += random.randint(-PASTE_OFFSET_JITTER_PX, PASTE_OFFSET_JITTER_PX)
+        paste_y += random.randint(-PASTE_OFFSET_JITTER_PX, PASTE_OFFSET_JITTER_PX)
 
-    for cell in cells:
-        occupied.add(cell)
+        bbox = alpha_bbox_for_pasted_sprite(sprite, paste_x, paste_y)
+        if bbox is None:
+            continue
 
-    sprite_path = os.path.join(SPRITE_DIR, ship_name)
-    sprite = resize_sprite_to_cells(sprite_path, ship_len, cell_size)
-    sprite = sprite.rotate(angle, expand=True)
-    sprite = augment_ship(sprite)
+        if not bbox_inside_image(bbox, img.width, img.height, margin=PLACEMENT_MARGIN_PX):
+            continue
 
-    sprite_bbox = paste_sprite_centered_on_cells(
-        img, sprite, cells, grid_x0, grid_y0, cell_size
-    )
-    cell_bbox = cell_block_pixel_bbox(cells, grid_x0, grid_y0, cell_size)
+        overlaps = any(bbox_intersects(bbox, other) for other in occupied_bboxes)
+        if overlaps:
+            continue
 
-    annotations.append({
-        "ship": os.path.splitext(ship_name)[0],
-        "sprite_file": ship_name,
-        "length_cells": ship_len,
-        "rotation_degrees": angle,
-        "start_cell": [start_r, start_c],
-        "occupied_cells": [[r, c] for r, c in cells],
-        "cell_bbox_xyxy": cell_bbox,
-        "sprite_bbox_xyxy": sprite_bbox,
-    })
+        paste_sprite(img, sprite, paste_x, paste_y)
+        occupied_bboxes.append(bbox)
 
-    return True
+        center_x = (bbox[0] + bbox[2]) / 2.0
+        center_y = (bbox[1] + bbox[3]) / 2.0
+
+        annotations.append({
+            "ship": os.path.splitext(ship_name)[0],
+            "sprite_file": ship_name,
+            "boat_set": boat_set,
+            "length_cells": ship_len,
+            "rotation_degrees": angle,
+            "pixels_per_cell": pixels_per_cell,
+            "center_xy": [center_x, center_y],
+            "sprite_bbox_xyxy": bbox,
+        })
+
+        return True
+
+    return False
+
 
 def finalize_output_image(img, output_mode="rgb"):
-    """
-    Convert final image to the requested output mode.
-
-    rgb  -> standard RGB image
-    luma -> extract Y channel from YCbCr and save as single-channel grayscale
-    """
     rgb_img = img.convert("RGB")
 
     if output_mode == "rgb":
@@ -403,124 +423,123 @@ def finalize_output_image(img, output_mode="rgb"):
 
     raise ValueError(f"Unsupported OUTPUT_MODE: {output_mode}")
 
-
-
 # ============================================================================
-# Main generation loop
+# Main
 # ============================================================================
 
-dataset_index = {
-    "train": [],
-    "val": [],
-    "test": [],
-}
+def main():
+    args = parse_args()
 
-num_train = int(NUM_IMAGES * TRAIN_SPLIT)
-num_val = int(NUM_IMAGES * VAL_SPLIT)
-num_test = NUM_IMAGES - num_train - num_val
+    if args.boat_set not in SPRITE_SETS:
+        raise ValueError(f"Unsupported boat set: {args.boat_set}")
 
-for img_idx in range(NUM_IMAGES):
-    split = get_split(img_idx, num_train, num_val)
-
-    if split == "train":
-        image_dir = IMAGE_TRAIN_DIR
-        label_dir = LABEL_TRAIN_DIR
-    elif split == "val":
-        image_dir = IMAGE_VAL_DIR
-        label_dir = LABEL_VAL_DIR
+    if args.background_mode == "ocean-texture":
+        ocean_texture = load_ocean_texture(args.ocean_texture_path)
     else:
-        image_dir = IMAGE_TEST_DIR
-        label_dir = LABEL_TEST_DIR
+        ocean_texture = None
 
-    stem = f"battleship_{img_idx:06d}"
-    img_name = f"{stem}.png"
-    json_name = f"{stem}.json"
+    image_train_dir = os.path.join(DATASET_DIR, "images", "train")
+    image_val_dir = os.path.join(DATASET_DIR, "images", "val")
+    image_test_dir = os.path.join(DATASET_DIR, "images", "test")
 
-    img_path = os.path.join(image_dir, img_name)
-    json_path = os.path.join(label_dir, json_name)
+    label_train_dir = os.path.join(DATASET_DIR, "labels", "train")
+    label_val_dir = os.path.join(DATASET_DIR, "labels", "val")
+    label_test_dir = os.path.join(DATASET_DIR, "labels", "test")
 
-    # Per-image grid geometry
-    grid_geom = compute_grid_geometry(IMG_W, IMG_H)
-    cell_size = grid_geom["cell_size"]
-    grid_x0 = grid_geom["grid_x0"]
-    grid_y0 = grid_geom["grid_y0"]
-    grid_x1 = grid_geom["grid_x1"]
-    grid_y1 = grid_geom["grid_y1"]
+    for d in [
+        image_train_dir, image_val_dir, image_test_dir,
+        label_train_dir, label_val_dir, label_test_dir,
+    ]:
+        os.makedirs(d, exist_ok=True)
 
-    # Background
-    bg_brightness = random.uniform(*BG_BRIGHTNESS_RANGE)
-    bg_color = jitter_color(BASE_BG_COLOR, jitter=10, brightness_scale=bg_brightness)
-
-    img = Image.new("RGB", (IMG_W, IMG_H), bg_color)
-    img = add_background_texture(img)
-    draw = ImageDraw.Draw(img)
-
-    # Grid
-    draw_grid = random.random() < DRAW_GRID_PROB
-    grid_brightness = random.uniform(*GRID_BRIGHTNESS_RANGE)
-    grid_line_color = jitter_color(BASE_GRID_LINE, jitter=8, brightness_scale=grid_brightness)
-
-    if draw_grid:
-        for c in range(GRID_COLS + 1):
-            x = grid_x0 + c * cell_size
-            draw.line([(x, grid_y0), (x, grid_y1)], fill=grid_line_color, width=1)
-
-        for r in range(GRID_ROWS + 1):
-            y = grid_y0 + r * cell_size
-            draw.line([(grid_x0, y), (grid_x1, y)], fill=grid_line_color, width=1)
-
-    img = img.convert("RGBA")
-
-    occupied = set()
-    annotations = []
-
-    target_num_boats = random.randint(MIN_BOATS, MAX_BOATS)
-
-    for _ in range(target_num_boats):
-        placed = place_one_random_ship(
-            img,
-            occupied,
-            annotations,
-            grid_x0,
-            grid_y0,
-            cell_size,
-        )
-        if not placed:
-            break
-
-    image_blur = random.uniform(*IMAGE_BLUR_RADIUS_RANGE)
-    if image_blur > 0.01:
-        img = img.filter(ImageFilter.GaussianBlur(radius=image_blur))
-
-    final_img = finalize_output_image(img, OUTPUT_MODE)
-    final_img.save(img_path)
-
-    label_record = {
-        "image": img_name,
-        "split": split,
-        "image_size": [IMG_W, IMG_H],
-        "grid": {
-            "rows": GRID_ROWS,
-            "cols": GRID_COLS,
-            "cell_size": cell_size,
-            "grid_top_left": [grid_x0, grid_y0],
-            "grid_bottom_right": [grid_x1, grid_y1],
-            "grid_drawn": draw_grid,
-        },
-        "objects": annotations,
-        "num_objects": len(annotations),
+    dataset_index = {
+        "train": [],
+        "val": [],
+        "test": [],
     }
 
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(label_record, f, indent=2)
+    num_train = int(NUM_IMAGES * TRAIN_SPLIT)
+    num_val = int(NUM_IMAGES * VAL_SPLIT)
+    num_test = NUM_IMAGES - num_train - num_val
 
-    dataset_index[split].append({
-        "image": os.path.join("images", split, img_name),
-        "label": os.path.join("labels", split, json_name),
-    })
+    for img_idx in range(NUM_IMAGES):
+        split = get_split(img_idx, num_train, num_val)
 
-with open(os.path.join(DATASET_DIR, "dataset_index.json"), "w", encoding="utf-8") as f:
-    json.dump(dataset_index, f, indent=2)
+        if split == "train":
+            image_dir = image_train_dir
+            label_dir = label_train_dir
+        elif split == "val":
+            image_dir = image_val_dir
+            label_dir = label_val_dir
+        else:
+            image_dir = image_test_dir
+            label_dir = label_test_dir
 
-print(f"Saved dataset to '{DATASET_DIR}/'")
-print(f"train={num_train}, val={num_val}, test={num_test}")
+        stem = f"battleship_{img_idx:06d}"
+        img_name = f"{stem}.png"
+        json_name = f"{stem}.json"
+
+        img_path = os.path.join(image_dir, img_name)
+        json_path = os.path.join(label_dir, json_name)
+
+        img = make_background(
+            IMG_W,
+            IMG_H,
+            background_mode=args.background_mode,
+            ocean_texture=ocean_texture,
+        )
+        img = img.convert("RGBA")
+
+        occupied_bboxes = []
+        annotations = []
+
+        target_num_boats = random.randint(MIN_BOATS, MAX_BOATS)
+
+        for _ in range(target_num_boats):
+            placed = place_one_random_ship(
+                img,
+                occupied_bboxes,
+                annotations,
+                boat_set=args.boat_set,
+            )
+            if not placed:
+                break
+
+        image_blur = random.uniform(*IMAGE_BLUR_RADIUS_RANGE)
+        if image_blur > 0.01:
+            img = img.filter(ImageFilter.GaussianBlur(radius=image_blur))
+
+        final_img = finalize_output_image(img, OUTPUT_MODE)
+        final_img.save(img_path)
+
+        label_record = {
+            "image": img_name,
+            "split": split,
+            "boat_set": args.boat_set,
+            "background_mode": args.background_mode,
+            "image_size": [IMG_W, IMG_H],
+            "objects": annotations,
+            "num_objects": len(annotations),
+        }
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(label_record, f, indent=2)
+
+        dataset_index[split].append({
+            "image": os.path.join("images", split, img_name),
+            "label": os.path.join("labels", split, json_name),
+        })
+
+    with open(os.path.join(DATASET_DIR, "dataset_index.json"), "w", encoding="utf-8") as f:
+        json.dump(dataset_index, f, indent=2)
+
+    print(f"Saved dataset to '{DATASET_DIR}/'")
+    print(f"boat_set={args.boat_set}")
+    print(f"background_mode={args.background_mode}")
+    if args.background_mode == "ocean-texture":
+        print(f"ocean_texture_path={args.ocean_texture_path}")
+    print(f"train={num_train}, val={num_val}, test={num_test}")
+
+
+if __name__ == "__main__":
+    main()
