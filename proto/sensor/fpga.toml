@@ -1,0 +1,5 @@
+["Status.spi_tx"]
+max_bytes = 64
+
+["Status.spi_rx"]
+max_bytes = 64

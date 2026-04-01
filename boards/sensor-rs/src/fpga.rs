@@ -13,6 +13,7 @@ use embassy_sync::{
     channel::Channel,
 };
 use embassy_time::{Duration, Timer};
+use heapless::Vec;
 
 use crate::{
     camera,
@@ -37,10 +38,13 @@ enum RunMode {
 const NUM_LINES: u32 = 240; // for QVGA
 const LINE_LEN: u32 = 320;
 const BYTE_PER_ADDR: u32 = 2; // FPGA is 16-bit addressed
+const SPI_PROTO_MAX_BYTES: usize = 64; // match fpga.toml
 
 static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(State::Off));
 static POWER_SIGNAL: PowerSignal<RunMode> = PowerSignal::new();
 static LINES_TO_SEND: Channel<ThreadModeRawMutex, image_::Line, 2> = Channel::new();
+static SPI_TX_TO_SEND: Channel<ThreadModeRawMutex, Vec<u8, SPI_PROTO_MAX_BYTES>, 8> = Channel::new();
+static SPI_RX_TO_SEND: Channel<ThreadModeRawMutex, Vec<u8, SPI_PROTO_MAX_BYTES>, 8> = Channel::new();
 
 #[embassy_executor::task]
 pub async fn task(r_power: FpgaPower, mut r_fpga: Fpga) {
@@ -146,7 +150,9 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
     } as u8;
     info!("Setting capture source over SPI (cmd={:x})", cmd);
     cs_n.set_low();
-    let _ = spi.write(&[cmd]).await;
+    let cmd = [cmd];
+    let _ = SPI_TX_TO_SEND.try_send(cmd.into());
+    let _ = spi.write(&cmd).await;
     cs_n.set_high();
 
     if src == CaptureSource::Camera {
@@ -188,8 +194,13 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
         let [_, _, addr_hi, addr_lo] = address.to_be_bytes();
 
         cs_n.set_low();
-        let _res = spi.write(&[spi_cmd::Command::Read as u8, addr_hi, addr_lo]).await;
+        let to_tx = [spi_cmd::Command::Read as u8, addr_hi, addr_lo];
+        let _ = SPI_TX_TO_SEND.try_send(to_tx.into());
+        let _res = spi.write(&to_tx).await;
         let _res = spi.read(new_line.mut_data()).await;
+
+        // Only send the first 64 bytes of image data
+        let _ = SPI_RX_TO_SEND.try_send(Vec::from_slice(&new_line.data()[0..SPI_PROTO_MAX_BYTES]).unwrap());
         cs_n.set_high();
 
         LINES_TO_SEND.send(new_line).await; // blocks until channel has capacity
@@ -253,6 +264,14 @@ pub fn get_status() -> Status {
 
     if let Ok(line) = LINES_TO_SEND.try_receive() {
         s.set_line(line);
+    }
+
+    if let Ok(tx) = SPI_TX_TO_SEND.try_receive() {
+        s.set_spi_tx(tx);
+    }
+
+    if let Ok(rx) = SPI_RX_TO_SEND.try_receive() {
+        s.set_spi_rx(rx);
     }
 
     s

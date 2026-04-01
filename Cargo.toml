@@ -6,7 +6,7 @@ members = [
     "apps/dashboard/backend",
     "apps/db-logger",
     "apps/flasher",
-    "apps/sensor-server",
+    "apps/sensor-server", "apps/spiview",
     "lib/rust/amber-connect",
     "lib/rust/flash-layout",
     "lib/rust/influx",
