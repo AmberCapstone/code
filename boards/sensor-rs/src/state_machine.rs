@@ -1,6 +1,7 @@
 use core::cell::Cell;
 
 use crate::{
+    camera,
     flow::ChangeSignal,
     fpga::{self, flash},
     proto::sensor_::{self, Action, State, fpga_},
@@ -31,7 +32,16 @@ pub async fn task(r: resources::StateMachine) {
 
     loop {
         select(low_power_loop(), vbat_ok.wait_for_high()).await;
-        select(normal_loop(), vbat_ok.wait_for_low()).await;
+        select(normal_loop(), async {
+            loop {
+                vbat_ok.wait_for_low().await;
+                Timer::after_millis(150).await; // debounce
+                if vbat_ok.is_low() {
+                    break;
+                }
+            }
+        })
+        .await;
     }
 }
 

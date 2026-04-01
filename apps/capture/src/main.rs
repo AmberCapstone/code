@@ -37,6 +37,11 @@ async fn main() -> anyhow::Result<()> {
         _ = tokio::signal::ctrl_c() => Err(anyhow!("Interrupted"))
     };
 
+    let mut reset = Command::default();
+    reset.set_action(Action::Monitor);
+
+    let _ = control.send(reset).await;
+
     control.release().await;
     r
 }

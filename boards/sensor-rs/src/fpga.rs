@@ -15,9 +15,13 @@ use embassy_sync::{
 use embassy_time::{Duration, Timer};
 
 use crate::{
+    camera,
     flow::poll,
     power::PowerSignal,
-    proto::sensor_::fpga_::{Action, CaptureSource, Command, State, Status, image_},
+    proto::sensor_::{
+        camera_,
+        fpga_::{Action, CaptureSource, Command, State, Status, image_},
+    },
     resources::{Fpga, FpgaPower, Irqs},
 };
 
@@ -41,13 +45,15 @@ static LINES_TO_SEND: Channel<ThreadModeRawMutex, image_::Line, 2> = Channel::ne
 #[embassy_executor::task]
 pub async fn task(r_power: FpgaPower, mut r_fpga: Fpga) {
     let mut power_en = Output::new(r_power.en, Level::Low, Speed::Low);
-    flash::turn_off();
 
     POWER_SIGNAL.turn_off();
 
     loop {
         flash::turn_off();
+        camera::turn_off();
+
         poll::until(flash::is_off, Duration::from_millis(50)).await;
+        poll::until(camera::is_off, Duration::from_millis(50)).await;
 
         power_en.set_low();
         set_state(State::Off);
@@ -56,17 +62,14 @@ pub async fn task(r_power: FpgaPower, mut r_fpga: Fpga) {
 
         power_en.set_high();
 
-        match mode {
-            RunMode::Capture(src) => {
-                select(run_capture(&mut r_fpga, src), POWER_SIGNAL.wait_for_off()).await;
+        select(POWER_SIGNAL.wait_for_off(), async {
+            match mode {
+                RunMode::Capture(src) => run_capture(&mut r_fpga, src).await,
+                RunMode::SpiFlash => run_spiflash(&mut r_fpga).await,
+                RunMode::RunConstant => run_constant(&mut r_fpga).await,
             }
-            RunMode::SpiFlash => {
-                select(run_spiflash(&mut r_fpga), POWER_SIGNAL.wait_for_off()).await;
-            }
-            RunMode::RunConstant => {
-                select(run_constant(&mut r_fpga), POWER_SIGNAL.wait_for_off()).await;
-            }
-        }
+        })
+        .await;
     }
 }
 
@@ -136,17 +139,29 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
     );
 
     let cmd = match src {
-        CaptureSource::Camera => spi_cmd::Command::Reset, // change once RealCapture command exists
+        CaptureSource::Camera => spi_cmd::Command::RealCapture,
         CaptureSource::FakeVga => spi_cmd::Command::FakeCaptureVga,
         CaptureSource::FakeSram => spi_cmd::Command::FakeCaptureWrite,
-        _ => panic!("src={:?} should not have passed handle_process", src),
+        _ => panic!("src={:?} should not have passed through handle_process", src),
     } as u8;
     info!("Setting capture source over SPI (cmd={:x})", cmd);
     cs_n.set_low();
     let _ = spi.write(&[cmd]).await;
     cs_n.set_high();
 
-    Timer::after_millis(10).await;
+    if src == CaptureSource::Camera {
+        // reduce instantaneous current by staggering FPGA and Camera boots
+        Timer::after_millis(200).await;
+
+        info!("Turning on the camera");
+        camera::turn_on();
+        poll::until(
+            || camera::get_state() == camera_::State::Running,
+            Duration::from_millis(50),
+        )
+        .await;
+    }
+    Timer::after_millis(100).await;
 
     info!("Setting capture high");
     start_capture.set_high();
@@ -157,6 +172,11 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
     info!("Waiting for drdy");
     drdy.wait_for_high().await;
     info!("Seen DRDY");
+
+    if src == CaptureSource::Camera {
+        info!("Turning on the camera");
+        camera::turn_off();
+    }
 
     for line_no in 0..NUM_LINES {
         info!("Line no {}", line_no);
