@@ -3,7 +3,7 @@ use defmt::{info, trace, warn};
 use embassy_futures::join::join3;
 use embassy_stm32::usb::{Driver, Instance};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
-use embassy_time::Timer;
+use embassy_time::{Duration, Ticker};
 use embassy_usb::{
     Builder,
     class::cdc_acm::{self, CdcAcmClass, Receiver, Sender},
@@ -81,6 +81,8 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
 
     let mut cobs_buf = [0u8; COBS_MAX_SIZE];
 
+    let mut ticker = Ticker::every(Duration::from_millis(10));
+
     loop {
         let state = STATE.lock().await.clone();
         let status = proto::sensor_::Status::default()
@@ -110,7 +112,7 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
         trace!("Sent tx_counter={}", state.tx_counter);
         STATE.lock().await.tx_counter += 1;
 
-        Timer::after_millis(10).await;
+        ticker.next().await;
     }
 }
 
