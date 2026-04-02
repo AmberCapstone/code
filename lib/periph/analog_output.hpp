@@ -1,6 +1,6 @@
 /** 
  * @file analog_output.hpp
- * @author Ivan Lange
+ * @author Blake Freer and Ivan Lange
  * @brief Analog output driver wrapper
  * 
  * @date 2026-03-22

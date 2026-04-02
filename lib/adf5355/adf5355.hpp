@@ -37,11 +37,11 @@ struct Driver {
     };
 
     struct InitParam {
-        DeviceId dev_id;
-        uint64_t freq_req {0};
+        DeviceId dev_id{DeviceId::ADF5355};
+        uint64_t freq_req {5725000000ULL};
         uint8_t  freq_req_chan {0};
-        uint32_t clkin_freq {0};
-        uint32_t cp_ua {0};
+        uint32_t clkin_freq {100000000UL};
+        uint32_t cp_ua {900};
         bool cp_neg_bleed_en {false};
         bool cp_gated_bleed_en {false};
         bool cp_bleed_current_polarity_en {false};
@@ -52,7 +52,7 @@ struct Driver {
         uint8_t outb_power {0};
         bool phase_detector_polarity_neg {false};
         bool ref_diff_en {false};
-        bool mux_out_3v3_en {false};
+        bool mux_out_3v3_en {true};
         uint8_t ref_doubler_en {0};
         uint8_t ref_div2_en {0};
         MuxOutSel mux_out_sel {MuxOutSel::DIGITAL_LOCK_DETECT};

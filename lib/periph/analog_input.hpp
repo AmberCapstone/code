@@ -1,6 +1,6 @@
 /** 
  * @file analog_input.hpp
- * @author Ivan Lange
+ * @author Blake Freer and Ivan Lange
  * @brief Analog input driver wrapper
  * 
  * @date 2026-03-22

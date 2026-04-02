@@ -85,6 +85,7 @@ void Error_Handler(void);
 #define COMM_RX_GPIO_Port GPIOC
 #define PWR_DOWN_Pin GPIO_PIN_0
 #define PWR_DOWN_GPIO_Port GPIOB
+#define PWR_DOWN_EXTI_IRQn EXTI0_1_IRQn
 #define P6V_CS_TWO_Pin GPIO_PIN_1
 #define P6V_CS_TWO_GPIO_Port GPIOB
 #define P6V_CS_ONE_Pin GPIO_PIN_2
@@ -95,8 +96,8 @@ void Error_Handler(void);
 #define DEBUG1_GPIO_Port GPIOE
 #define P12V_CS_Pin GPIO_PIN_10
 #define P12V_CS_GPIO_Port GPIOB
-#define FAN1_PWM_Pin GPIO_PIN_9
-#define FAN1_PWM_GPIO_Port GPIOA
+#define FAN1_PWN_Pin GPIO_PIN_9
+#define FAN1_PWN_GPIO_Port GPIOA
 #define WARN_LIGHT_Pin GPIO_PIN_6
 #define WARN_LIGHT_GPIO_Port GPIOC
 #define FAN2_PWM_Pin GPIO_PIN_7
@@ -161,7 +162,7 @@ void Error_Handler(void);
 #define VCO_MUXOUT_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-
+extern int pwr_down_flag;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
