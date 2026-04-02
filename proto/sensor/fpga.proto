@@ -36,6 +36,8 @@ message Status {
     flash.Status flash = 2;
 
     optional image.Line line = 3;
+    optional bytes spi_tx = 4;
+    optional bytes spi_rx = 5;
 }
 
 message Command {
