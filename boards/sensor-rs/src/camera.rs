@@ -1,7 +1,7 @@
 use core::cell::Cell;
 use core::future::pending;
 
-use defmt::{debug, info, warn};
+use defmt::{info, warn};
 use embassy_futures::select::select;
 use embassy_stm32::gpio::{Flex, Level, Output, OutputOpenDrain, Speed};
 use embassy_stm32::i2c::{self, I2c};
@@ -9,10 +9,10 @@ use embassy_stm32::rcc::{Mco, McoConfig, McoPrescaler, McoSource};
 use embassy_stm32::time::Hertz;
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
-use embassy_time::{Duration, Timer};
+use embassy_time::Timer;
 
 use crate::power::PowerSignal;
-use crate::proto::sensor_::camera_::{Action, Command, State, Status};
+use crate::proto::sensor_::camera_::{State, Status};
 use crate::resources::{Camera, CameraPower, Irqs};
 
 mod sccb;
@@ -53,48 +53,30 @@ pub async fn run_fsm(r: &mut Camera) {
         c
     });
 
-    // let mut dbg = OutputOpenDrain::new(r.scl.reborrow(), Level::High, Speed::Low);
-    // let mut dbg2 = OutputOpenDrain::new(r.sda.reborrow(), Level::High, Speed::Low);
-
-    // loop {
-    //     dbg.toggle();
-    //     dbg2.toggle();
-    //     Timer::after_millis(100).await;
-    // }
-
-    let mut i2c = I2c::new_blocking(r.i2c.reborrow(), r.scl.reborrow(), r.sda.reborrow(), {
-        let mut config = i2c::Config::default();
-        config.timeout = Duration::from_millis(100);
-        // config.gpio_speed = Speed::Medium;
-        // config.frequency = Hertz::khz(100);
-        // config.scl_pullup = true;
-        // config.sda_pullup = true;
-        config
-    });
-    // let i2c = I2c::new(
-    //     r.i2c.reborrow(),
-    //     r.scl.reborrow(),
-    //     r.sda.reborrow(),
-    //     r.dma_tx.reborrow(),
-    //     r.dma_rx.reborrow(),
-    //     Irqs,
-    //     {
-    //         let mut config = i2c::Config::default();
-    //         config.gpio_speed = Speed::Medium;
-    //         config.frequency = Hertz::khz(100);
-    //         config.scl_pullup = false;
-    //         config.scl_pullup = false;
-    //         config
-    //     },
-    // );
+    let i2c = I2c::new(
+        r.i2c.reborrow(),
+        r.scl.reborrow(),
+        r.sda.reborrow(),
+        r.dma_tx.reborrow(),
+        r.dma_rx.reborrow(),
+        Irqs,
+        {
+            let mut config = i2c::Config::default();
+            config.gpio_speed = Speed::Medium;
+            config.frequency = Hertz::khz(100);
+            config.scl_pullup = false;
+            config.scl_pullup = false;
+            config
+        },
+    );
 
     set_state(State::Booting);
-    Timer::after_millis(50).await; // I2C gets stuck if we use it too fast
+    Timer::after_millis(20).await; // I2C gets stuck if we use it too fast
 
     let mut sccb = sccb::SccbInterface::new(i2c);
 
     loop {
-        match sccb.read_register(sccb::Reg::MIDH) {
+        match sccb.read_register(sccb::Reg::MIDH).await {
             Ok(midh) if midh == sccb::Reg::MIDH.initial() => {
                 info!("Connected to Camera over I2C");
                 break;
@@ -105,27 +87,26 @@ pub async fn run_fsm(r: &mut Camera) {
 
         Timer::after_millis(10).await;
     }
-    Timer::after_millis(500).await;
 
     set_state(State::Configuring);
 
     let settings = [
-        (sccb::Reg::CLKRC, 0x9f), // input clock prescaler = 2
+        (sccb::Reg::CLKRC, 0x87), // input clock prescaler = 8
         (sccb::Reg::TSLB, 0x00),  // output sequence YUYV
         // QVGA Settings (from Table 2-2)
         (sccb::Reg::COM7, 0x00),
         (sccb::Reg::COM3, 0x04),  // No scale, no tristate (this is default)
-        (sccb::Reg::COM14, 0x19), // No manual scaling, PCLK divider = 1
+        (sccb::Reg::COM14, 0x18), // No manual scaling, PCLK divider = 1
         (sccb::Reg::COM10, 0x20),
-        (sccb::Reg::SCALING_XSC, 0x3A),
-        (sccb::Reg::SCALING_YSC, 0x35),
+        (sccb::Reg::SCALING_XSC, 0x3A | 0b1000_0000), // 8-bar color bar test pattern
+        (sccb::Reg::SCALING_YSC, 0x35 | 0b0000_0000), // 8-bar color bar test pattern
         (sccb::Reg::SCALING_DCWCTR, 0x11),
-        (sccb::Reg::SCALING_PCLK_DIV, 0xF1),
+        (sccb::Reg::SCALING_PCLK_DIV, 0xF0),
         (sccb::Reg::SCALING_PCLK_DELAY, 0x02),
     ];
 
     for (reg, val) in settings {
-        let _ = sccb.write_register(reg, val);
+        let _ = sccb.write_register(reg, val).await;
     }
 
     Timer::after_millis(300).await; // wait for settings to apply
