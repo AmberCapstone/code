@@ -2731,6 +2731,7 @@ name = "sensor-server"
 version = "0.1.0"
 dependencies = [
  "amber-connect",
+ "anyhow",
  "bytes",
  "clap",
  "cobs",

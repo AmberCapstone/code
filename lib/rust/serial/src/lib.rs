@@ -13,9 +13,9 @@ use tokio_util::{
 use codec::{RxCodec, TxCodec};
 
 pub async fn run<Tx, Rx, F: Fn(&UsbPortInfo) -> bool + Clone>(
-    port_condition: F,
     mut outgoing: mpsc::Receiver<Tx>,
     incoming: mpsc::Sender<Rx>,
+    port_condition: F,
     stop: CancellationToken,
 ) where
     Tx: prost::Message + Default + 'static,
@@ -23,20 +23,20 @@ pub async fn run<Tx, Rx, F: Fn(&UsbPortInfo) -> bool + Clone>(
 {
     stop.run_until_cancelled(async {
         loop {
-            tracing::info!("Looking for serial ports");
+            tracing::info!("looking for serial ports");
             let port_info = find_connection(&port_condition, Duration::from_secs(1)).await;
 
-            tracing::info!("Opening serial port {}", port_info.port_name);
+            tracing::info!("opening serial port {}", port_info.port_name);
             match tokio_serial::new(port_info.port_name.clone(), 9600).open_native_async() {
                 Ok(port) => {
-                    tracing::info!("Connected to {}", port_info.port_name);
+                    tracing::info!("connected to {}", port_info.port_name);
                     match run_connection(port, &mut outgoing, &incoming).await {
                         RunConnectionError::ChannelClosed => break,
                         RunConnectionError::SerialClosed => (),
                     }
                 }
                 Err(e) => {
-                    tracing::error!(err=?e, "Failed to connect to port. Trying again in 1 second.");
+                    tracing::error!(err=?e, "failed to connect to port. Trying again in 1 second.");
                     sleep(Duration::from_secs(1)).await;
                 }
             }
@@ -97,30 +97,29 @@ where
     let mut writer = FramedWrite::new(port_write, TxCodec::<Tx>::default());
 
     loop {
-        tracing::trace!("New loop");
         tokio::select! {
             rx = reader.next() => match rx {
                 Some(Ok(msg)) => {
-                    tracing::debug!("Received a valid message from serial");
+                    tracing::trace!("received a valid message from serial");
                     if incoming.send(msg).await.is_err() {
-                        tracing::error!("Upstream rx channel closed");
+                        tracing::error!("incoming channel closed");
                         return RunConnectionError::ChannelClosed;
                     }
                 }
-                Some(Err(e)) => tracing::warn!("Invalid rx message ({e})"),
+                Some(Err(e)) => tracing::warn!("invalid rx message ({e})"),
                 None => {
-                    tracing::warn!("Serial port closed");
+                    tracing::info!("serial port closed");
                     return RunConnectionError::SerialClosed;
                 },
             },
             tx = outgoing.recv() => if let Some(command) = tx {
-                tracing::trace!("Sending a tx message over serial");
+                tracing::trace!("sending a tx message over serial");
                 if writer.send(command).await.is_err() {
-                    tracing::error!("Failed to send tx message over serial");
+                    tracing::error!("failed to send tx message over serial");
                     return RunConnectionError::SerialClosed;
                 }
             } else {
-                tracing::error!("Upstream TX channel closed");
+                tracing::error!("outgoing channel closed");
                 return RunConnectionError::ChannelClosed;
             }
         }

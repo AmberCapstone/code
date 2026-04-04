@@ -2,7 +2,7 @@ use amber_connect::{
     codec::{PbReceiver, PbSocketError},
     control,
 };
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use proto::sensor::{
@@ -26,11 +26,13 @@ struct Args {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
+    let mut control = control::Client::try_acquire("capture")
+        .await
+        .context("Failed to acquire exclusive control")?;
+
     let mut status_socket = SubSocket::new();
     status_socket.connect(amber_connect::endpoint::STATUS).await?;
     status_socket.subscribe("").await?;
-
-    let mut control = control::Client::try_acquire("capture").await?;
 
     let r = tokio::select! {
         r = capture(args, &mut control, &mut status_socket) => r,
@@ -47,21 +49,29 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn capture(args: Args, control: &mut control::Client, status_socket: &mut SubSocket) -> anyhow::Result<()> {
+    const TIMEOUT: Duration = Duration::from_secs(1);
+
     println!("Resetting");
     let mut cmd = Command::default();
     cmd.set_action(Action::Monitor);
     control.send(cmd).await?;
     timeout(
-        Duration::from_secs(1),
+        TIMEOUT,
         wait_until(status_socket, |s| s.state() != sensor::State::Manual),
     )
-    .await??;
+    .await
+    .context("Timed out trying to reset the sensor")??;
 
     println!("Starting Capture");
     let mut cmd = Command::default();
     cmd.set_action(Action::Manual);
     control.send(cmd).await?;
-    wait_until(status_socket, |s| s.state() == sensor::State::Manual).await?;
+    timeout(
+        TIMEOUT,
+        wait_until(status_socket, |s| s.state() == sensor::State::Manual),
+    )
+    .await
+    .context("Timed out trying to enter manual mode")??;
 
     let cmd = Command {
         fpga: Some({
@@ -72,7 +82,7 @@ async fn capture(args: Args, control: &mut control::Client, status_socket: &mut 
         }),
         ..Default::default()
     };
-    control.send(cmd).await?;
+    timeout(Duration::from_secs(1), control.send(cmd)).await??;
 
     let mut img_buf: Vec<u8> = Vec::with_capacity((NUM_LINES * BYTE_PER_LINE) as usize);
 
@@ -85,7 +95,10 @@ async fn capture(args: Args, control: &mut control::Client, status_socket: &mut 
 
     for lineno in 0..NUM_LINES {
         'wait: loop {
-            if let Some(line) = status_socket.recv_msg::<Status>().await?.fpga.and_then(|fp| fp.line) {
+            let resp = timeout(TIMEOUT, status_socket.recv_msg::<Status>())
+                .await
+                .context("Timed out waiting for a new status")??;
+            if let Some(line) = resp.fpga.and_then(|fp| fp.line) {
                 if line.number != lineno {
                     println!("WRONG LINE");
                     continue;

@@ -1,6 +1,7 @@
 use std::time::{Duration, SystemTime};
 
 use thiserror::Error;
+use tokio::time::timeout;
 use zeromq::{ReqSocket, Socket, ZmqError};
 
 use super::{
@@ -40,7 +41,10 @@ impl Client {
     /// Unexpected response
     pub async fn try_acquire(name: &str) -> Result<Self, ClientError> {
         let mut socket = ReqSocket::new();
-        socket.connect(endpoint::COMMAND).await?;
+
+        timeout(Duration::from_secs(1), socket.connect(endpoint::COMMAND))
+            .await
+            .map_err(|_| ClientError::Timeout)??;
         socket
             .send_json::<Req>(&Request::Acquire { name: name.to_string() })
             .await?;
@@ -143,6 +147,9 @@ pub enum ClientError {
 
     #[error("the client's request was misformed")]
     InvalidRequest,
+
+    #[error("timed out waiting on server response")]
+    Timeout,
 }
 
 impl From<ZmqError> for ClientError {

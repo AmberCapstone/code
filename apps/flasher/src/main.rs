@@ -2,6 +2,7 @@ use amber_connect::{
     codec::{PbReceiver, PbSocketError},
     control,
 };
+use anyhow::Context;
 use anyhow::anyhow;
 use clap::{Parser, ValueEnum};
 use file::FlashFile;
@@ -19,7 +20,7 @@ use std::{
     thread,
     time::{Duration, SystemTime},
 };
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 use zeromq::{Socket, SubSocket};
 
 mod file;
@@ -39,7 +40,9 @@ struct Args {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let mut control = control::Client::try_acquire("flasher").await?;
+    let mut control = control::Client::try_acquire("flasher")
+        .await
+        .context("Failed to acquire exclusive sensor control")?;
 
     let mut status_socket = SubSocket::new();
     status_socket.connect(amber_connect::endpoint::STATUS).await?;
@@ -52,24 +55,49 @@ async fn main() -> anyhow::Result<()> {
         _ = tokio::signal::ctrl_c() => Err(anyhow!("Interrupted"))
     };
 
+    let mut reset = Command::default();
+    reset.set_action(Action::Monitor);
+
+    let _ = control.send(reset).await;
+
     control.release().await;
     r
 }
 
 async fn flash(file: FlashFile, control: &mut control::Client, status_socket: &mut SubSocket) -> anyhow::Result<()> {
+    const TIMEOUT: Duration = Duration::from_secs(1);
+
     println!("Resetting");
     let mut cmd = Command::default();
     cmd.set_action(Action::Monitor);
     timeout(
-        Duration::from_secs(2),
-        command_until(cmd, |s| s.state() != sensor::State::Manual, control, status_socket),
+        Duration::from_secs(1),
+        command_until(
+            cmd,
+            |s| s.state() != sensor::State::Manual,
+            control,
+            status_socket,
+            TIMEOUT,
+        ),
     )
-    .await??;
+    .await
+    .context("Timed out trying to reset the sensor")??;
 
     println!("Entering manual mode");
     let mut cmd = Command::default();
     cmd.set_action(Action::Manual);
-    command_until(cmd, |s| s.state() == sensor::State::Manual, control, status_socket).await?;
+    timeout(
+        TIMEOUT,
+        command_until(
+            cmd,
+            |s| s.state() == sensor::State::Manual,
+            control,
+            status_socket,
+            TIMEOUT,
+        ),
+    )
+    .await
+    .context("Timed out trying to enter manual mode")??;
 
     println!("Activating SPI Flash circuit");
     let mut fpga_cmd = fpga::Command::default();
@@ -92,6 +120,7 @@ async fn flash(file: FlashFile, control: &mut control::Client, status_socket: &m
         },
         control,
         status_socket,
+        TIMEOUT,
     )
     .await?;
 
@@ -161,6 +190,7 @@ async fn flash(file: FlashFile, control: &mut control::Client, status_socket: &m
         },
         control,
         status_socket,
+        TIMEOUT,
     )
     .await?;
 
@@ -207,25 +237,16 @@ async fn flash(file: FlashFile, control: &mut control::Client, status_socket: &m
     println!("Exiting manual mode");
     let mut cmd = Command::default();
     cmd.set_action(Action::Monitor);
-    command_until(cmd, |s| s.state() != sensor::State::Manual, control, status_socket).await?;
+    command_until(
+        cmd,
+        |s| s.state() != sensor::State::Manual,
+        control,
+        status_socket,
+        TIMEOUT,
+    )
+    .await?;
 
     if errors.is_empty() {
-        println!("Entering manual mode");
-        let mut cmd = Command::default();
-        cmd.set_action(Action::Manual);
-        command_until(cmd, |s| s.state() == sensor::State::Manual, control, status_socket).await?;
-
-        println!("Starting FPGA");
-        let mut cmd = Command::default();
-        cmd.fpga.get_or_insert_default().set_action(fpga::Action::RunConstant);
-        command_until(
-            cmd,
-            |s| s.fpga.as_ref().is_some_and(|fp| fp.state() == fpga::State::Running),
-            control,
-            status_socket,
-        )
-        .await?;
-
         Ok(())
     } else {
         println!("Errors detected: {}", errors.len());
@@ -243,10 +264,12 @@ async fn command_until(
     condition: impl Fn(&Status) -> bool,
     control: &mut control::Client,
     status_socket: &mut SubSocket,
+    timeout: Duration,
 ) -> anyhow::Result<()> {
     tokio::select! {
         r = control.send_continuous(cmd, INTERVAL) => r?,
-        r = wait_until(status_socket, condition) => r.map(|_| ())?
+        r = wait_until(status_socket, condition) => r.map(|_| ())?,
+        _ = sleep(timeout) => {return Err(anyhow!("timed out"));}
     };
     Ok(())
 }

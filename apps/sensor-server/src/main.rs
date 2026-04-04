@@ -1,13 +1,15 @@
-use amber_connect::{codec::PbSender, control};
+use amber_connect::control;
 use clap::Parser;
+use futures::{FutureExt, TryFutureExt};
 use proto::sensor::{Command, Status};
+use std::time::Duration;
+use tokio::{sync::mpsc, task::JoinSet};
 use tokio_serial::UsbPortInfo;
+use tokio_util::sync::CancellationToken;
+use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use std::{error::Error, time::Duration};
-use tokio::{select, sync::mpsc};
-use tokio_util::sync::CancellationToken;
-use zeromq::{PubSocket, Socket};
+mod status;
 
 const LEASE_DURATION: Duration = Duration::from_secs(60);
 
@@ -18,7 +20,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let filter = match args.verbose {
         0 => "info",
@@ -32,43 +34,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .init();
 
     let (command_tx, command_rx) = mpsc::channel::<Command>(100);
-    let (status_tx, mut status_rx) = mpsc::channel::<Status>(100);
+    let (status_tx, status_rx) = mpsc::channel::<Status>(100);
 
     let stop = CancellationToken::new();
 
-    let mut status_socket = PubSocket::new();
-    status_socket.bind(amber_connect::endpoint::STATUS).await?;
-
-    let stop_serial = stop.clone();
-    let j1 = tokio::spawn(serial::run(is_sensor_board, command_rx, status_tx, stop_serial));
-
-    let stop_control = stop.clone();
-    let j2 = tokio::spawn(async move {
-        let _r = control::server::run(command_tx, LEASE_DURATION, stop_control.clone()).await;
-        stop_control.cancel();
+    let mut services = JoinSet::<anyhow::Result<()>>::new();
+    services.spawn(serial::run(command_rx, status_tx, is_sensor_board, stop.clone()).map(Ok));
+    services.spawn(control::server::run(command_tx, LEASE_DURATION, stop.clone()).map_err(anyhow::Error::from));
+    services.spawn(status::run(status_rx, stop.clone()).map_err(anyhow::Error::from));
+    services.spawn(async move {
+        tokio::signal::ctrl_c().await.expect("failed to install CTRL-C handler");
+        info!("user killed the server");
+        Ok(())
     });
 
-    let stop_status = stop.clone();
-    let j3 = tokio::spawn(async move {
-        loop {
-            select! {
-                status = status_rx.recv() => {
-                    match status {
-                        Some(status) => status_socket.send_msg(&status).await.unwrap(),
-                        None => break
-                    }
-                }
-                () = stop_status.cancelled() => { break; }
-            }
+    while let Some(exit_value) = services.join_next().await {
+        if let Err(err) = exit_value {
+            error!(err=?err, "task failed");
         }
-        status_socket.close().await;
-    });
-
-    tokio::signal::ctrl_c().await.unwrap();
-    tracing::info!("Stopping server");
-    stop.cancel();
-
-    let _ = tokio::join!(j1, j2, j3);
+        stop.cancel();
+    }
 
     Ok(())
 }

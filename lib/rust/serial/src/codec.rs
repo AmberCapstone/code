@@ -24,11 +24,11 @@ impl<Rx: prost::Message + Default> Decoder for RxCodec<Rx> {
                     tracing::trace!("decoded a valid message");
                     Ok(Some(msg))
                 } else {
-                    tracing::warn!("dropping message - invalid protobuf");
+                    tracing::debug!("dropping message - invalid protobuf");
                     Ok(None)
                 }
             } else {
-                tracing::warn!("dropping message - invalid COBS");
+                tracing::debug!("dropping message - invalid COBS");
                 Ok(None)
             }
         } else {
