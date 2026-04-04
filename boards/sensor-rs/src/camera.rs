@@ -43,7 +43,9 @@ pub async fn task(r_power: CameraPower, mut r: Camera) {
 }
 
 pub async fn run_fsm(r: &mut Camera) {
-    let _reset_n = OutputOpenDrain::new(r.reset_n.reborrow(), Level::High, Speed::Low);
+    use sccb::Reg;
+
+    let mut reset_n = OutputOpenDrain::new(r.reset_n.reborrow(), Level::High, Speed::Low);
     let _power_down = Output::new(r.pwrdn.reborrow(), Level::Low, Speed::Low);
 
     let _mco = Mco::new(r.mco.reborrow(), r.xclk.reborrow(), McoSource::HSI48, {
@@ -88,25 +90,57 @@ pub async fn run_fsm(r: &mut Camera) {
         Timer::after_millis(10).await;
     }
 
+    // Hard reset
+    reset_n.set_low();
+    Timer::after_millis(2).await;
+    reset_n.set_high();
+    Timer::after_millis(2).await;
+
     set_state(State::Configuring);
 
+    const SENSOR_HEIGHT: u16 = 480;
+    const SENSOR_WIDTH: u16 = 640;
+    const BLANK_COLS: u16 = 144;
+
+    // From Adafruit_OV7670
+    const VSTART: u16 = 10;
+    const HSTART: u16 = 176;
+    const EDGE_OFFSET: u16 = 0;
+    const PCLK_DELAY: u16 = 2;
+    const VSTOP: u16 = VSTART + SENSOR_HEIGHT;
+    const HSTOP: u16 = (HSTART + SENSOR_WIDTH) % (SENSOR_WIDTH + BLANK_COLS);
+
+    let r_hstart = (HSTART >> 3) as u8;
+    let r_hstop = (HSTOP >> 3) as u8;
+    let r_href = (EDGE_OFFSET << 6) as u8 | ((HSTOP & 0b111) << 3) as u8 | (HSTART & 0b111) as u8;
+    let r_vtart = (VSTART >> 2) as u8;
+    let r_vstop = (VSTOP >> 2) as u8;
+    let r_vref = ((VSTOP & 0b11) << 2) as u8 | (VSTART & 0b11) as u8;
+
     let settings = [
-        (sccb::Reg::CLKRC, 0x87), // input clock prescaler = 8
-        (sccb::Reg::TSLB, 0x00),  // output sequence YUYV
-        // QVGA Settings (from Table 2-2)
-        (sccb::Reg::COM7, 0x00),
-        (sccb::Reg::COM3, 0x04),  // No scale, no tristate (this is default)
-        (sccb::Reg::COM14, 0x18), // No manual scaling, PCLK divider = 1
-        (sccb::Reg::COM10, 0x20),
-        (sccb::Reg::SCALING_XSC, 0x3A | 0b1000_0000), // 8-bar color bar test pattern
-        (sccb::Reg::SCALING_YSC, 0x35 | 0b0000_0000), // 8-bar color bar test pattern
-        (sccb::Reg::SCALING_DCWCTR, 0x11),
-        (sccb::Reg::SCALING_PCLK_DIV, 0xF0),
-        (sccb::Reg::SCALING_PCLK_DELAY, 0x02),
+        (Reg::CLKRC, 0x00), // input clock prescaler = 1
+        (Reg::TSLB, 0x00),  // output sequence YUYV
+        (Reg::COM10, 0x00), // run PCLK continuously to clock FPGA
+        (Reg::COM7, 0x00),  // YUV
+        (Reg::COM15, 0xc0), // full dynamic range
+        (Reg::COM3, 0x04),
+        (Reg::COM14, 0x19),
+        (Reg::SCALING_XSC, 0x3a),
+        (Reg::SCALING_YSC, 0x35),
+        (Reg::SCALING_DCWCTR, 0x11),
+        (Reg::SCALING_PCLK_DIV, 0xf1),
+        (Reg::SCALING_PCLK_DELAY, 2),
+        (Reg::HSTART, r_hstart),
+        (Reg::HSTOP, r_hstop),
+        (Reg::HREF, r_href),
+        (Reg::VSTRT, r_vtart),
+        (Reg::VSTOP, r_vstop),
+        (Reg::VREF, r_vref),
     ];
 
     for (reg, val) in settings {
         let _ = sccb.write_register(reg, val).await;
+        Timer::after_millis(2).await;
     }
 
     Timer::after_millis(300).await; // wait for settings to apply
