@@ -1,9 +1,8 @@
 #include "carrier.hpp"
 
+#include "Src/power/power.hpp"
 #include "lib/adf5355/adf5355.hpp"
 #include "lib/periph/spi.hpp"
-
-#include "Src/power/power.hpp"
 
 // CubeMX
 #include "adc.h"
@@ -13,7 +12,8 @@ namespace {
 
 static amber::periph::DigitalOutput lpaEn(*LPA_EN_GPIO_Port, LPA_EN_Pin);
 static amber::periph::DigitalOutput vcoCe(*VCO_CE_GPIO_Port, VCO_CE_Pin);
-static amber::periph::DigitalInput vcoMuxOut(*VCO_MUXOUT_GPIO_Port, VCO_MUXOUT_Pin);
+static amber::periph::DigitalInput vcoMuxOut(*VCO_MUXOUT_GPIO_Port,
+                                             VCO_MUXOUT_Pin);
 static amber::periph::AnalogInput lpaPowerDetect(hadc1, ADC_CHANNEL_7);
 
 static bool vcoLocked = false;

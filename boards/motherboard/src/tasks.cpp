@@ -1,22 +1,14 @@
 #include "tasks.hpp"
 
 #include "FreeRTOS.h"
-#include "dac.h"
-
-#include "power/power.hpp"
 #include "carrier/carrier.hpp"
-#include "lib/adf5355/adf5355.hpp"
-#include "lib/periph/analog_output.hpp"
-#include "lib/periph/analog_input.hpp"
 #include "lib/periph/digital.hpp"
-#include "lib/periph/pwm.hpp"
-#include "lib/periph/spi.hpp"
 #include "main.h"
-#include "spi.h"
+#include "power/power.hpp"
 #include "task.h"
+#include "thermal/thermal.hpp"
+#include "serial/serial.hpp"
 #include "tim.h"
-#include "dac.h"
-#include "adc.h"
 
 enum {
     PRIORITY_1HZ = 1,
@@ -33,6 +25,9 @@ StackType_t t1000hz_stack[STACK_SIZE_WORDS];
 StaticTask_t t100hz_ctrl;
 StackType_t t100hz_stack[STACK_SIZE_WORDS];
 
+StaticTask_t t10hz_ctrl;
+StackType_t t10hz_stack[STACK_SIZE_WORDS];
+
 StaticTask_t t1hz_ctrl;
 StackType_t t1hz_stack[STACK_SIZE_WORDS];
 
@@ -40,34 +35,9 @@ auto task_1000hz(void* argument) -> void {
     (void)argument;
     TickType_t wake_time = xTaskGetTickCount();
 
-    // amber::periph::DigitalInput  comparator(*COMPARATOR_GPIO_Port, COMPARATOR_Pin);
-    // amber::periph::AnalogOutput  logv(hdac1, DAC1_CHANNEL_2);
-    // amber::periph::AnalogInput   read(hadc1, ADC_CHANNEL_0);
-    // amber::periph::DigitalOutput debug2(*DEBUG2_GPIO_Port, DEBUG2_Pin);
-
-    // // --- Configuration ---
-    // constexpr uint32_t TASK_HZ      = 1000;
-    // constexpr float    DECAY_RATE   = 0.001f;  // volts lost per tick — tune this
-    // constexpr float    PEAK_FLOOR   = 0.0f;    // minimum peak hold value
-
-    // float peak_hold = 0.0f;
-
-    // logv.SetVoltage(0.95f);
-
     while (true) {
+        serial::Receive();
         vTaskDelayUntil(&wake_time, pdMS_TO_TICKS(1));
-
-        // float new_sample = read.ReadVoltage();
-
-        // // Latch any new peak immediately
-        // if (new_sample > peak_hold) {
-        //     peak_hold = new_sample;
-        // } else {
-        //     // Slowly decay when no new peak
-        //     peak_hold = std::max(peak_hold - DECAY_RATE, PEAK_FLOOR);
-        // }
-
-        // debug2.Set(comparator.Read());
     }
 }
 
@@ -78,8 +48,20 @@ auto task_100hz(void* argument) -> void {
     while (true) {
         power::Update_100hz();
         carrier::Update_100hz();
+        serial::Update_100hz();
 
         vTaskDelayUntil(&wake_time, pdMS_TO_TICKS(10));
+    }
+};
+
+auto task_10hz(void* argument) -> void {
+    (void)argument;
+    TickType_t wake_time = xTaskGetTickCount();
+
+    while (true) {
+        thermal::Update10Hz();
+
+        vTaskDelayUntil(&wake_time, pdMS_TO_TICKS(100));
     }
 };
 
@@ -97,11 +79,16 @@ auto task_1hz(void* argument) -> void {
 };
 
 auto MX_FREERTOS_Init() -> void {
+    serial::Init();
     power::Init();
     carrier::Init();
+    thermal::Init();
 
     xTaskCreateStatic(task_1hz, "1Hz", STACK_SIZE_WORDS, NULL, PRIORITY_1HZ,
                       t1hz_stack, &t1hz_ctrl);
+
+    xTaskCreateStatic(task_10hz, "10Hz", STACK_SIZE_WORDS, NULL, PRIORITY_10HZ,
+                      t10hz_stack, &t10hz_ctrl);
 
     xTaskCreateStatic(task_100hz, "100Hz", STACK_SIZE_WORDS, NULL,
                       PRIORITY_100HZ, t100hz_stack, &t100hz_ctrl);

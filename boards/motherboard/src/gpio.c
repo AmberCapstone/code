@@ -71,7 +71,7 @@ void MX_GPIO_Init(void) {
                       LPA_EN_Pin | VGA_ATTSEL0_Pin | VGA_EN_Pin |
                           VGA_ATTSEL1_Pin | P12V_HSD_DIAG_EN_Pin |
                           FAN1_PWR_EN_Pin | FAN2_PWR_EN_Pin |
-                          P6V_HDS_ONE_DIAG_EN_Pin,
+                          P6V_HSD_ONE_DIAG_EN_Pin,
                       GPIO_PIN_RESET);
 
     /*Configure GPIO pin Output Level */
@@ -136,11 +136,11 @@ void MX_GPIO_Init(void) {
 
     /*Configure GPIO pins : LPA_EN_Pin VGA_ATTSEL0_Pin VGA_EN_Pin
        VGA_ATTSEL1_Pin P12V_HSD_DIAG_EN_Pin FAN1_PWR_EN_Pin FAN2_PWR_EN_Pin
-       P6V_HDS_ONE_DIAG_EN_Pin */
+       P6V_HSD_ONE_DIAG_EN_Pin */
     GPIO_InitStruct.Pin = LPA_EN_Pin | VGA_ATTSEL0_Pin | VGA_EN_Pin |
                           VGA_ATTSEL1_Pin | P12V_HSD_DIAG_EN_Pin |
                           FAN1_PWR_EN_Pin | FAN2_PWR_EN_Pin |
-                          P6V_HDS_ONE_DIAG_EN_Pin;
+                          P6V_HSD_ONE_DIAG_EN_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

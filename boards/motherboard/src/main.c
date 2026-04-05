@@ -99,7 +99,7 @@ int main(void) {
     MX_SPI3_Init();
     MX_TIM2_Init();
     /* USER CODE BEGIN 2 */
-
+    MX_USB_Device_Init();
     /* USER CODE END 2 */
 
     /* Call init function for freertos objects (in cmsis_os2.c) */

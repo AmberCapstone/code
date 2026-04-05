@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package base_station;
+
+message Command {
+    uint32 dummy = 1;
+}
+
+message Status {
+    uint32 dummy_echo = 1;
+    // Diagnostics
+    optional uint32 tx_counter = 14;
+    optional uint32 rx_counter = 15;
+}

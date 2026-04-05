@@ -21,14 +21,20 @@ static float p12vCurrent = 0.0f;
 static power::PowerMuxState powerMuxState = power::PowerMuxState::USB_POWER;
 
 auto P6VHsd1Config() -> amber::tps274160b::Config& {
-    static amber::periph::DigitalOutput en0(*VCO_PWR_EN_GPIO_Port, VCO_PWR_EN_Pin);
-    static amber::periph::DigitalOutput en3(*VGA_PWR_EN_GPIO_Port, VGA_PWR_EN_Pin);
+    static amber::periph::DigitalOutput en0(*VCO_PWR_EN_GPIO_Port,
+                                            VCO_PWR_EN_Pin);
+    static amber::periph::DigitalOutput en3(*VGA_PWR_EN_GPIO_Port,
+                                            VGA_PWR_EN_Pin);
 
-    static amber::periph::DigitalOutput diagSel0(*P6V_HSD_ONE_SEL_GPIO_Port, P6V_HSD_ONE_SEL_Pin);
-    static amber::periph::DigitalOutput diagSel1(*P6V_HSD_ONE_SEH_GPIO_Port, P6V_HSD_ONE_SEH_Pin);
+    static amber::periph::DigitalOutput diagSel0(*P6V_HSD_ONE_SEL_GPIO_Port,
+                                                 P6V_HSD_ONE_SEL_Pin);
+    static amber::periph::DigitalOutput diagSel1(*P6V_HSD_ONE_SEH_GPIO_Port,
+                                                 P6V_HSD_ONE_SEH_Pin);
 
-    static amber::periph::DigitalInput fault(*P6V_HSD_ONE_nFAULT_GPIO_Port, P6V_HSD_ONE_nFAULT_Pin);
-    static amber::periph::DigitalOutput diagEn(*P6V_HDS_ONE_DIAG_EN_GPIO_Port, P6V_HDS_ONE_DIAG_EN_Pin);
+    static amber::periph::DigitalInput fault(*P6V_HSD_ONE_nFAULT_GPIO_Port,
+                                             P6V_HSD_ONE_nFAULT_Pin);
+    static amber::periph::DigitalOutput diagEn(*P6V_HSD_ONE_DIAG_EN_GPIO_Port,
+                                               P6V_HSD_ONE_DIAG_EN_Pin);
     static amber::periph::AnalogInput currentSense(hadc1, ADC_CHANNEL_10);
 
     static amber::tps274160b::Config cfg{
@@ -45,15 +51,22 @@ auto P6VHsd1Config() -> amber::tps274160b::Config& {
 
 auto P6VHsd2Config() -> amber::tps274160b::Config& {
     static amber::periph::DigitalOutput en0(*GEN_EN_GPIO_Port, GEN_EN_Pin);
-    static amber::periph::DigitalOutput en1(*VGA_PWR_EN_GPIO_Port, VGA_PWR_EN_Pin);
-    static amber::periph::DigitalOutput en2(*LPA_PWR_EN_GPIO_Port, LPA_PWR_EN_Pin);
-    static amber::periph::DigitalOutput en3(*VCO_PWR_EN_GPIO_Port, VCO_PWR_EN_Pin);
+    static amber::periph::DigitalOutput en1(*VGA_PWR_EN_GPIO_Port,
+                                            VGA_PWR_EN_Pin);
+    static amber::periph::DigitalOutput en2(*LPA_PWR_EN_GPIO_Port,
+                                            LPA_PWR_EN_Pin);
+    static amber::periph::DigitalOutput en3(*VCO_PWR_EN_GPIO_Port,
+                                            VCO_PWR_EN_Pin);
 
-    static amber::periph::DigitalOutput diagSel0(*P6V_HSD_TWO_SEL_GPIO_Port, P6V_HSD_TWO_SEL_Pin);
-    static amber::periph::DigitalOutput diagSel1(*P6V_HSD_TWO_SEH_GPIO_Port, P6V_HSD_TWO_SEH_Pin);
+    static amber::periph::DigitalOutput diagSel0(*P6V_HSD_TWO_SEL_GPIO_Port,
+                                                 P6V_HSD_TWO_SEL_Pin);
+    static amber::periph::DigitalOutput diagSel1(*P6V_HSD_TWO_SEH_GPIO_Port,
+                                                 P6V_HSD_TWO_SEH_Pin);
 
-    static amber::periph::DigitalInput fault(*P6V_HSD_TWO_nFAULT_GPIO_Port, P6V_HSD_TWO_nFAULT_Pin);
-    static amber::periph::DigitalOutput diagEn(*P6V_HSD_TWO_DIAG_EN_GPIO_Port, P6V_HSD_TWO_DIAG_EN_Pin);
+    static amber::periph::DigitalInput fault(*P6V_HSD_TWO_nFAULT_GPIO_Port,
+                                             P6V_HSD_TWO_nFAULT_Pin);
+    static amber::periph::DigitalOutput diagEn(*P6V_HSD_TWO_DIAG_EN_GPIO_Port,
+                                               P6V_HSD_TWO_DIAG_EN_Pin);
     static amber::periph::AnalogInput currentSense(hadc1, ADC_CHANNEL_9);
 
     static amber::tps274160b::Config cfg{
@@ -69,8 +82,10 @@ auto P6VHsd2Config() -> amber::tps274160b::Config& {
 }
 
 auto P6VScatterConfig() -> amber::tps1h100::Config& {
-    static amber::periph::DigitalOutput en(*P6V_SCATTER_PWR_EN_GPIO_Port, P6V_SCATTER_PWR_EN_Pin);
-    static amber::periph::DigitalOutput diagEn(*P6V_SCATTER_HSD_DIAG_EN_GPIO_Port, P6V_SCATTER_HSD_DIAG_EN_Pin);
+    static amber::periph::DigitalOutput en(*P6V_SCATTER_PWR_EN_GPIO_Port,
+                                           P6V_SCATTER_PWR_EN_Pin);
+    static amber::periph::DigitalOutput diagEn(
+        *P6V_SCATTER_HSD_DIAG_EN_GPIO_Port, P6V_SCATTER_HSD_DIAG_EN_Pin);
     static amber::periph::AnalogInput currentSense(hadc1, ADC_CHANNEL_4);
 
     static amber::tps1h100::Config cfg{
@@ -84,7 +99,8 @@ auto P6VScatterConfig() -> amber::tps1h100::Config& {
 }
 
 auto P12VHsdConfig() -> amber::tps1h100::Config& {
-    static amber::periph::DigitalOutput diagEn(*P12V_HSD_DIAG_EN_GPIO_Port, P12V_HSD_DIAG_EN_Pin);
+    static amber::periph::DigitalOutput diagEn(*P12V_HSD_DIAG_EN_GPIO_Port,
+                                               P12V_HSD_DIAG_EN_Pin);
     static amber::periph::AnalogInput currentSense(hadc1, ADC_CHANNEL_11);
 
     static amber::tps1h100::Config cfg{750, nullptr, diagEn, currentSense};
@@ -136,9 +152,11 @@ auto Init() noexcept -> void {
 }
 
 auto Update_100hz() noexcept -> void {
-    powerMuxState = powerMux.Read() ? PowerMuxState::BARREL_JACK : PowerMuxState::USB_POWER;
+    powerMuxState =
+        powerMux.Read() ? PowerMuxState::BARREL_JACK : PowerMuxState::USB_POWER;
 
-    if (GetPowerMuxState() == PowerMuxState::USB_POWER || carrier::GetPowerDown()) {
+    if (GetPowerMuxState() == PowerMuxState::USB_POWER ||
+        carrier::GetPowerDown()) {
         P6VHsd1().disableAll();
         P6VHsd2().disableAll();
         P6VScatter().disable();
@@ -165,11 +183,13 @@ auto GetPowerMuxState() noexcept -> PowerMuxState {
     return powerMuxState;
 }
 
-auto GetP6VHsd1Currents() noexcept -> const std::array<float, amber::tps274160b::kNumChannels>& {
+auto GetP6VHsd1Currents() noexcept
+    -> const std::array<float, amber::tps274160b::kNumChannels>& {
     return hsd1Currents;
 }
 
-auto GetP6VHsd2Currents() noexcept -> const std::array<float, amber::tps274160b::kNumChannels>& {
+auto GetP6VHsd2Currents() noexcept
+    -> const std::array<float, amber::tps274160b::kNumChannels>& {
     return hsd2Currents;
 }
 
