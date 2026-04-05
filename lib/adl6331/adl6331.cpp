@@ -1,6 +1,6 @@
 #include "adl6331.hpp"
 
-namespace amber::adl6331 {
+namespace amber::driver::adl6331 {
 
 Driver::Driver(periph::Spi& spi, const Config& config)
     : _spi(spi), _config(config) {}

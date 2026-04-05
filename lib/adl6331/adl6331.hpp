@@ -77,11 +77,12 @@ typedef struct {
     bool amp2_en {true};
     bool dsa_en {true};
 
-    std::array<StateConfig, 4> states = {
+    std::array<StateConfig, 4> states = {{
         {AmpMode::BYPASS, AmpMode::BYPASS, 24},
         {AmpMode::FIXED_GAIN, AmpMode::FIXED_GAIN, 16},
         {AmpMode::FIXED_GAIN, AmpMode::FIXED_GAIN, 8},
-        {AmpMode::FIXED_GAIN, AmpMode::FIXED_GAIN, 0}};
+        {AmpMode::FIXED_GAIN, AmpMode::FIXED_GAIN, 0}
+    }};
 } Config;
 
 struct Driver {

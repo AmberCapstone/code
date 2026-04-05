@@ -48,6 +48,9 @@ struct DigitalOutput {
     auto SetLow() noexcept -> void {
         HAL_GPIO_WritePin(&_port, _pin, GPIO_PIN_RESET);
     }
+    auto Set(bool value) noexcept -> void {
+        HAL_GPIO_WritePin(&_port, _pin, value ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    }
     auto Toggle() noexcept -> void {
         HAL_GPIO_TogglePin(&_port, _pin);
     }

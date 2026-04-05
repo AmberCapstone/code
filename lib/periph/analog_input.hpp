@@ -47,8 +47,7 @@ private:
         ADC_ChannelConfTypeDef adcConfig = {
             .Channel = _adcChannel,
             .Rank = ADC_REGULAR_RANK_1,
-            .SamplingTime = ADC_SAMPLETIME_28CYCLES
-            .Offset = 0
+            .SamplingTime = ADC_SAMPLETIME_19CYCLES_5,
         };
 
         HAL_ADC_ConfigChannel(&_hadc, &adcConfig);

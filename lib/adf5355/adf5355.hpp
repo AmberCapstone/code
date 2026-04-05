@@ -225,4 +225,4 @@ private:
     auto set_freq(uint64_t freq, uint8_t chan) noexcept -> int32_t;
 };
 
-} // namespace amber::devices
+} // namespace amber::adf5355

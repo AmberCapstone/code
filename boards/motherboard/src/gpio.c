@@ -85,8 +85,10 @@ void MX_GPIO_Init(void) {
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-    /*Configure GPIO pins : TEMP_ALERT_N_Pin P5V_VSENSE_Pin P12V_VSENSE_Pin */
-    GPIO_InitStruct.Pin = TEMP_ALERT_N_Pin | P5V_VSENSE_Pin | P12V_VSENSE_Pin;
+    /*Configure GPIO pins : TEMP_ALERT_N_Pin COMPARATOR_Pin P5V_VSENSE_Pin
+     * P12V_VSENSE_Pin */
+    GPIO_InitStruct.Pin =
+        TEMP_ALERT_N_Pin | COMPARATOR_Pin | P5V_VSENSE_Pin | P12V_VSENSE_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);

@@ -79,10 +79,8 @@ void Error_Handler(void);
 #define DAC_ADJ_GPIO_Port GPIOA
 #define LPA_PWR_DET_Pin GPIO_PIN_7
 #define LPA_PWR_DET_GPIO_Port GPIOA
-#define COMM_TX_Pin GPIO_PIN_4
-#define COMM_TX_GPIO_Port GPIOC
-#define COMM_RX_Pin GPIO_PIN_5
-#define COMM_RX_GPIO_Port GPIOC
+#define COMPARATOR_Pin GPIO_PIN_5
+#define COMPARATOR_GPIO_Port GPIOC
 #define PWR_DOWN_Pin GPIO_PIN_0
 #define PWR_DOWN_GPIO_Port GPIOB
 #define PWR_DOWN_EXTI_IRQn EXTI0_1_IRQn
