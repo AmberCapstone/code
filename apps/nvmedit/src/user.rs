@@ -4,7 +4,7 @@ use proto::sensor::nvm::Parameters;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// Creates a more user-friendly structure that the packed proto
+/// Creates a more user-friendly structure than the packed proto
 #[derive(Serialize, Deserialize)]
 pub struct UserParameters {
     name: String,
@@ -17,7 +17,7 @@ pub enum ConversionError {
     #[error("Name is too long. Max 7 characters")]
     NameTooLong,
 
-    #[error("Invalid hex string \"{0}\". Expect form \"0x1A\"")]
+    #[error("Invalid hex string \"{0}\". Expected form is \"0x1A\"")]
     InvalidHex(String),
 }
 
