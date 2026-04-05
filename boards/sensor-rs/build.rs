@@ -16,7 +16,7 @@ fn generate_proto() -> Result<()> {
         "sensor/fpga/flash.proto",
         "sensor/fpga/image.proto",
         "sensor/measure.proto",
-        "sensor/parameters.proto",
+        "sensor/nvm.proto",
     ];
 
     // Check for config files
@@ -37,6 +37,8 @@ fn generate_proto() -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    println!("cargo:rustc-link=search=.");
+    println!("cargo:rerun-if-changed=memory.x");
     println!("cargo:rustc-link-arg-bins=--nmagic");
     println!("cargo:rustc-link-arg-bins=-Tlink.x");
     println!("cargo:rustc-link-arg-bins=-Tdefmt.x");

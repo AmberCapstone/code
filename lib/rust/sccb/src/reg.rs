@@ -1,7 +1,11 @@
 #![allow(clippy::doc_markdown)]
 
+use strum::FromRepr;
+
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, FromRepr, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "hash", derive(std::hash::Hash))]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms, reason = "to match datasheet")]
 pub enum Reg {
     /// Gain control
@@ -399,6 +403,7 @@ pub enum Reg {
 }
 
 impl Reg {
+    #[must_use]
     #[allow(clippy::too_many_lines)]
     pub const fn initial(self) -> u8 {
         #[allow(clippy::match_same_arms, reason = "values are logically independent")]

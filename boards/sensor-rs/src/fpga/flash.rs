@@ -1,7 +1,4 @@
-use core::{
-    cell::Cell,
-    sync::atomic::{AtomicU32, Ordering},
-};
+use core::sync::atomic::{AtomicU32, Ordering};
 
 use defmt::{debug, error, info};
 use embassy_futures::select::select;
@@ -12,10 +9,7 @@ use embassy_stm32::{
     time::Hertz,
 };
 use embassy_sync::{
-    blocking_mutex::{
-        Mutex,
-        raw::{CriticalSectionRawMutex, ThreadModeRawMutex},
-    },
+    blocking_mutex::raw::{CriticalSectionRawMutex, ThreadModeRawMutex},
     channel::Channel,
     signal::Signal,
     watch::Watch,
@@ -24,6 +18,7 @@ use embassy_time::{Duration, TimeoutError, WithTimeout};
 use embedded_hal::digital::OutputPin;
 
 use crate::{
+    flow::StateLock,
     fpga::flash::spiflash::SpiFlash,
     power::PowerSignal,
     proto::sensor_::fpga_::flash_::{Action, Command, Page, State, Status},
@@ -64,7 +59,7 @@ impl From<TimeoutError> for Error {
 
 static POWER_SIGNAL: PowerSignal<()> = PowerSignal::new();
 static OPERATION: Signal<CriticalSectionRawMutex, Trigger> = Signal::new();
-static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(State::Off));
+static STATE: StateLock<State> = StateLock::new(State::Off);
 
 static RN: AtomicU32 = AtomicU32::new(0);
 static PAGE_RX: Channel<ThreadModeRawMutex, Page, ARQ_N> = Channel::new();
@@ -79,7 +74,7 @@ pub async fn task(mut r: Flash) {
 
     #[allow(clippy::never_loop)]
     loop {
-        set_state(State::Off);
+        STATE.set(State::Off);
         POWER_SIGNAL.wait_for_on().await;
 
         select(run(&mut r), POWER_SIGNAL.wait_for_off()).await;
@@ -88,7 +83,7 @@ pub async fn task(mut r: Flash) {
 
 async fn run(r: &mut Flash) {
     loop {
-        set_state(State::Idle);
+        STATE.set(State::Idle);
         OPERATION.reset();
         let trigger = OPERATION.wait().await;
         DONE.reset();
@@ -169,11 +164,11 @@ impl Trigger {
 }
 
 async fn flash_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>) -> Result<(), Error> {
-    set_state(State::Erasing);
+    STATE.set(State::Erasing);
     info!("Erasing Flash");
     flash.chip_erase().await?;
 
-    set_state(State::Programming);
+    STATE.set(State::Programming);
     info!("Programming Flash");
 
     for pg_num in 0..PAGE_PER_FILE {
@@ -213,7 +208,7 @@ async fn flash_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>
 }
 
 async fn readout_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>) -> Result<(), Error> {
-    set_state(State::Readout);
+    STATE.set(State::Readout);
     info!("Starting readout");
 
     let mut last_page_loaded: Option<u32> = None;
@@ -258,7 +253,7 @@ fn compute_crc(page_number: u32, data: &[u8], crc: &mut Crc<'_>) -> u32 {
 pub fn get_status() -> Status {
     let mut s = Status::default();
 
-    let state = get_state();
+    let state = STATE.get();
     s.set_state(state);
 
     match state {
@@ -293,14 +288,6 @@ pub fn handle_command(mut command: Command) {
     }
 }
 
-pub fn get_state() -> State {
-    STATE.lock(Cell::get)
-}
-
-fn set_state(state: State) {
-    STATE.lock(|s| s.set(state));
-}
-
 pub(super) fn turn_on() {
     POWER_SIGNAL.turn_on(());
 }
@@ -310,5 +297,5 @@ pub(super) fn turn_off() {
 }
 
 pub(super) fn is_off() -> bool {
-    get_state() == State::Off
+    STATE.is(State::Off)
 }

@@ -5,7 +5,7 @@ package sensor;
 import "sensor/camera.proto";
 import "sensor/fpga.proto";
 import "sensor/measure.proto";
-import "sensor/parameters.proto";
+import "sensor/nvm.proto";
 
 enum State {
     STATE_UNKNOWN = 0;
@@ -26,6 +26,7 @@ message Command {
 
     optional fpga.Command fpga = 2;
     optional camera.Command camera = 3;
+    optional nvm.Command nvm = 4;
 }
 
 message Status {
@@ -35,6 +36,7 @@ message Status {
 
     optional fpga.Status fpga = 4;
     optional camera.Status camera = 5;
+    optional nvm.Status nvm = 6;
 
     // Diagnostics
     optional string name = 13;

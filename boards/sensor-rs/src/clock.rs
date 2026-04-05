@@ -1,6 +1,5 @@
 use embassy_stm32::rcc::{
-    AHBPrescaler, APBPrescaler, Config, Hsi48Config, LsConfig, Pll, PllMul, PllPDiv, PllPreDiv, PllRDiv, PllSource,
-    Sysclk,
+    AHBPrescaler, APBPrescaler, Config, Hsi48Config, LsConfig, Sysclk,
     mux::{Adcsel, Clk48sel, ClockMux},
 };
 

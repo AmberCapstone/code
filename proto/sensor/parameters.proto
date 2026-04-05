@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package sensor;
-
-message Parameters {
-    float supercapacitor_mf = 1;
-}

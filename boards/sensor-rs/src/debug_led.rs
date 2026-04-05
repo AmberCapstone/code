@@ -1,24 +1,63 @@
+use core::future::pending;
+
 use defmt::info;
+use embassy_futures::select::{Either, select};
 use embassy_stm32::gpio::{Level, Output};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, signal::Signal};
-use embassy_time::{Duration, Timer};
-use heapless::Vec;
+use embassy_time::Timer;
 
 use crate::resources;
 
 static NEW_SEQUENCE: Signal<ThreadModeRawMutex, Sequence> = Signal::new();
 
+#[allow(unused)]
 #[derive(Clone, Copy)]
 pub enum Sequence {
-    Normal,
+    Toggle,
     Error,
+    LowCharge,
+    Charging,
+    On,
+    Off,
+}
+
+async fn pulse_ms(led: &mut Output<'_>, ms: u64) {
+    led.set_high();
+    Timer::after_millis(ms).await;
+    led.set_low();
 }
 
 impl Sequence {
-    fn get_pattern(self) -> Pattern {
+    async fn run(&self, led: &mut Output<'_>) {
         match self {
-            Self::Normal => Pattern::from_array([Blink::from_millis(500, 500)]),
-            Self::Error => Pattern::from_array([Blink::from_millis(125, 125), Blink::from_millis(125, 125 + 500)]),
+            Sequence::Toggle => loop {
+                led.set_high();
+                Timer::after_millis(500).await;
+                led.set_low();
+                Timer::after_millis(500).await;
+            },
+            Sequence::Error => loop {
+                pulse_ms(led, 100).await;
+                Timer::after_millis(400).await;
+            },
+            Sequence::LowCharge => loop {
+                pulse_ms(led, 10).await;
+                pending::<()>().await;
+            },
+            Sequence::On => {
+                led.set_high();
+                pending::<()>().await;
+            }
+            Sequence::Off => {
+                led.set_low();
+                pending::<()>().await;
+            }
+            Sequence::Charging => {
+                pulse_ms(led, 50).await;
+                Timer::after_millis(50).await;
+                pulse_ms(led, 50).await;
+                pending::<()>().await;
+            }
         }
     }
 }
@@ -27,19 +66,12 @@ impl Sequence {
 pub async fn led_task(r: resources::Leds) {
     let mut led = Output::new(r.debug_led, Level::High, embassy_stm32::gpio::Speed::Low);
 
-    let mut seq = Sequence::Normal;
+    let mut seq = Sequence::LowCharge;
 
     info!("Starting LED task");
     loop {
-        if let Some(new_sig) = NEW_SEQUENCE.try_take() {
-            seq = new_sig;
-        }
-
-        for blink in seq.get_pattern() {
-            led.set_high();
-            Timer::after(blink.on).await;
-            led.set_low();
-            Timer::after(blink.off).await;
+        if let Either::First(new_seq) = select(NEW_SEQUENCE.wait(), seq.run(&mut led)).await {
+            seq = new_seq;
         }
     }
 }
@@ -47,20 +79,3 @@ pub async fn led_task(r: resources::Leds) {
 pub fn send(s: Sequence) {
     NEW_SEQUENCE.signal(s);
 }
-
-#[derive(Clone)]
-struct Blink {
-    on: Duration,
-    off: Duration,
-}
-
-impl Blink {
-    const fn from_millis(on: u64, off: u64) -> Self {
-        Self {
-            on: Duration::from_millis(on),
-            off: Duration::from_millis(off),
-        }
-    }
-}
-
-type Pattern = Vec<Blink, 3>;

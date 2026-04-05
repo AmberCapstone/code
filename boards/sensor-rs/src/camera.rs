@@ -1,23 +1,24 @@
-use core::cell::Cell;
 use core::future::pending;
-
 use defmt::{info, warn};
 use embassy_futures::select::select;
-use embassy_stm32::gpio::{Flex, Level, Output, OutputOpenDrain, Speed};
-use embassy_stm32::i2c::{self, I2c};
-use embassy_stm32::rcc::{Mco, McoConfig, McoPrescaler, McoSource};
-use embassy_stm32::time::Hertz;
-use embassy_sync::blocking_mutex::Mutex;
-use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
+use embassy_stm32::{
+    gpio::{Flex, Level, Output, OutputOpenDrain, Speed},
+    i2c::{self, I2c},
+    rcc::{Mco, McoConfig, McoPrescaler, McoSource},
+    time::Hertz,
+};
 use embassy_time::Timer;
+use sccb::{self, Reg};
 
 use crate::power::PowerSignal;
 use crate::proto::sensor_::camera_::{State, Status};
 use crate::resources::{Camera, CameraPower, Irqs};
+use crate::{flow::StateLock, nvm};
+use interface::CameraInterface;
 
-mod sccb;
+mod interface;
 
-static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(State::Off));
+static STATE: StateLock<State> = StateLock::new(State::Off);
 static POWER_SIGNAL: PowerSignal<()> = PowerSignal::new();
 
 #[embassy_executor::task]
@@ -33,7 +34,7 @@ pub async fn task(r_power: CameraPower, mut r: Camera) {
         Flex::new(r.scl.reborrow()).set_as_analog();
 
         power_en.set_low();
-        set_state(State::Off);
+        STATE.set(State::Off);
 
         POWER_SIGNAL.wait_for_on().await;
 
@@ -43,8 +44,6 @@ pub async fn task(r_power: CameraPower, mut r: Camera) {
 }
 
 pub async fn run_fsm(r: &mut Camera) {
-    use sccb::Reg;
-
     let mut reset_n = OutputOpenDrain::new(r.reset_n.reborrow(), Level::High, Speed::Low);
     let _power_down = Output::new(r.pwrdn.reborrow(), Level::Low, Speed::Low);
 
@@ -72,13 +71,13 @@ pub async fn run_fsm(r: &mut Camera) {
         },
     );
 
-    set_state(State::Booting);
+    STATE.set(State::Booting);
     Timer::after_millis(20).await; // I2C gets stuck if we use it too fast
 
-    let mut sccb = sccb::SccbInterface::new(i2c);
+    let mut cam = CameraInterface::new(i2c);
 
     loop {
-        match sccb.read_register(sccb::Reg::MIDH).await {
+        match cam.read_register(sccb::Reg::MIDH).await {
             Ok(midh) if midh == sccb::Reg::MIDH.initial() => {
                 info!("Connected to Camera over I2C");
                 break;
@@ -96,70 +95,24 @@ pub async fn run_fsm(r: &mut Camera) {
     reset_n.set_high();
     Timer::after_millis(2).await;
 
-    set_state(State::Configuring);
+    STATE.set(State::Configuring);
 
-    const SENSOR_HEIGHT: u16 = 480;
-    const SENSOR_WIDTH: u16 = 640;
-    const BLANK_COLS: u16 = 144;
-
-    // From Adafruit_OV7670
-    const VSTART: u16 = 10;
-    const HSTART: u16 = 176;
-    const EDGE_OFFSET: u16 = 0;
-    const PCLK_DELAY: u16 = 2;
-    const VSTOP: u16 = VSTART + SENSOR_HEIGHT;
-    const HSTOP: u16 = (HSTART + SENSOR_WIDTH) % (SENSOR_WIDTH + BLANK_COLS);
-
-    let r_hstart = (HSTART >> 3) as u8;
-    let r_hstop = (HSTOP >> 3) as u8;
-    let r_href = (EDGE_OFFSET << 6) as u8 | ((HSTOP & 0b111) << 3) as u8 | (HSTART & 0b111) as u8;
-    let r_vtart = (VSTART >> 2) as u8;
-    let r_vstop = (VSTOP >> 2) as u8;
-    let r_vref = ((VSTOP & 0b11) << 2) as u8 | (VSTART & 0b11) as u8;
-
-    let settings = [
-        (Reg::CLKRC, 0x00), // input clock prescaler = 1
-        (Reg::TSLB, 0x00),  // output sequence YUYV
-        (Reg::COM10, 0x00), // run PCLK continuously to clock FPGA
-        (Reg::COM7, 0x00),  // YUV
-        (Reg::COM15, 0xc0), // full dynamic range
-        (Reg::COM3, 0x04),
-        (Reg::COM14, 0x19),
-        (Reg::SCALING_XSC, 0x3a),
-        (Reg::SCALING_YSC, 0x35),
-        (Reg::SCALING_DCWCTR, 0x11),
-        (Reg::SCALING_PCLK_DIV, 0xf1),
-        (Reg::SCALING_PCLK_DELAY, 2),
-        (Reg::HSTART, r_hstart),
-        (Reg::HSTOP, r_hstop),
-        (Reg::HREF, r_href),
-        (Reg::VSTRT, r_vtart),
-        (Reg::VSTOP, r_vstop),
-        (Reg::VREF, r_vref),
-    ];
+    let settings = nvm::get_camera_settings();
 
     for (reg, val) in settings {
-        let _ = sccb.write_register(reg, val).await;
+        let _ = cam.write_register(reg, val).await;
         Timer::after_millis(2).await;
     }
 
     Timer::after_millis(300).await; // wait for settings to apply
 
-    set_state(State::Running);
+    STATE.set(State::Running);
 
     pending::<()>().await;
 }
 
-fn set_state(state: State) {
-    STATE.lock(|s| s.set(state));
-}
-
-pub fn get_state() -> State {
-    STATE.lock(Cell::get)
-}
-
 pub fn get_status() -> Status {
-    Status::default().init_state(get_state())
+    Status::default().init_state(STATE.get())
 }
 
 pub fn turn_on() {
@@ -171,5 +124,45 @@ pub fn turn_off() {
 }
 
 pub fn is_off() -> bool {
-    get_state() == State::Off
+    STATE.is(State::Off)
+}
+
+pub fn is_running() -> bool {
+    STATE.is(State::Running)
+}
+
+#[allow(clippy::as_conversions, clippy::cast_possible_truncation)]
+pub fn get_default_settings() -> heapless::Vec<(Reg, u8), { sccb::NUM_REGISTERS }> {
+    // From Adafruit_OV7670
+    const VSTART: u16 = 10;
+    const HSTART: u16 = 176;
+    const EDGE_OFFSET: u16 = 0;
+    const PCLK_DELAY: u8 = 2;
+    const VSTOP: u16 = VSTART + sccb::SENSOR_HEIGHT;
+    const HSTOP: u16 = (HSTART + sccb::SENSOR_WIDTH) % (sccb::SENSOR_WIDTH + sccb::BLANK_COLUMNS);
+
+    [
+        (Reg::CLKRC, 0x00), // input clock prescaler = 1
+        (Reg::TSLB, 0x00),  // output sequence YUYV
+        (Reg::COM10, 0x00), // run PCLK continuously to clock FPGA
+        (Reg::COM7, 0x00),  // YUV
+        (Reg::COM15, 0xc0), // full dynamic range
+        (Reg::COM3, 0x04),
+        (Reg::COM14, 0x19),
+        (Reg::SCALING_XSC, 0x3a),
+        (Reg::SCALING_YSC, 0x35),
+        (Reg::SCALING_DCWCTR, 0x11),
+        (Reg::SCALING_PCLK_DIV, 0xf1),
+        (Reg::SCALING_PCLK_DELAY, PCLK_DELAY),
+        (Reg::HSTART, (HSTART >> 3) as u8),
+        (Reg::HSTOP, (HSTOP >> 3) as u8),
+        (
+            Reg::HREF,
+            (EDGE_OFFSET << 6) as u8 | ((HSTOP & 0b111) << 3) as u8 | (HSTART & 0b111) as u8,
+        ),
+        (Reg::VSTRT, (VSTART >> 2) as u8),
+        (Reg::VSTOP, (VSTOP >> 2) as u8),
+        (Reg::VREF, ((VSTOP & 0b11) << 2) as u8 | (VSTART & 0b11) as u8),
+    ]
+    .into()
 }

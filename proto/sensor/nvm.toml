@@ -1,0 +1,5 @@
+["Parameters.name"]
+max_bytes = 7
+
+["Parameters.camera_settings"]
+max_len = 202 # camera has 202 registers (0x00 - 0xc9)

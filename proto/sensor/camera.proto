@@ -22,15 +22,9 @@ enum Action {
 
 message Status {
     State state = 1;
-    optional Settings current_settings = 2;
 }
 
 message Command {
     bool enable_power = 1;
     optional Action action = 2;
-    optional Settings new_settings = 3;
-}
-
-message Settings {
-    uint32 exposure_us = 1;
 }

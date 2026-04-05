@@ -1,4 +1,4 @@
-use core::{cell::Cell, future::pending};
+use core::future::pending;
 
 use defmt::{Debug2Format, debug, info};
 use embassy_futures::select::select;
@@ -8,21 +8,15 @@ use embassy_stm32::{
     spi::{self, Spi},
     time::Hertz,
 };
-use embassy_sync::{
-    blocking_mutex::{Mutex, raw::ThreadModeRawMutex},
-    channel::Channel,
-};
+use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, channel::Channel};
 use embassy_time::{Duration, Timer};
 use heapless::Vec;
 
 use crate::{
     camera,
-    flow::poll,
+    flow::{StateLock, poll},
     power::PowerSignal,
-    proto::sensor_::{
-        camera_,
-        fpga_::{Action, CaptureSource, Command, State, Status, image_},
-    },
+    proto::sensor_::fpga_::{Action, CaptureSource, Command, State, Status, image_},
     resources::{Fpga, FpgaPower, Irqs},
 };
 
@@ -40,7 +34,7 @@ const LINE_LEN: u32 = 320;
 const BYTE_PER_ADDR: u32 = 2; // FPGA is 16-bit addressed
 const SPI_PROTO_MAX_BYTES: usize = 64; // match fpga.toml
 
-static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(State::Off));
+static STATE: StateLock<State> = StateLock::new(State::Off);
 static POWER_SIGNAL: PowerSignal<RunMode> = PowerSignal::new();
 static LINES_TO_SEND: Channel<ThreadModeRawMutex, image_::Line, 2> = Channel::new();
 static SPI_TX_TO_SEND: Channel<ThreadModeRawMutex, Vec<u8, SPI_PROTO_MAX_BYTES>, 8> = Channel::new();
@@ -60,7 +54,7 @@ pub async fn task(r_power: FpgaPower, mut r_fpga: Fpga) {
         poll::until(camera::is_off, Duration::from_millis(50)).await;
 
         power_en.set_low();
-        set_state(State::Off);
+        STATE.set(State::Off);
 
         let mode = POWER_SIGNAL.wait_for_on().await;
 
@@ -78,7 +72,7 @@ pub async fn task(r_power: FpgaPower, mut r_fpga: Fpga) {
 }
 
 pub async fn run_constant(r: &mut Fpga) {
-    set_state(State::Booting);
+    STATE.set(State::Booting);
     let mut _reset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
     let mut cdone = ExtiInput::new(r.cdone.reborrow(), r.cdone_exti.reborrow(), Pull::None, Irqs);
 
@@ -87,7 +81,7 @@ pub async fn run_constant(r: &mut Fpga) {
     cdone.wait_for_high().await;
     info!("CDONE complete");
 
-    set_state(State::Running);
+    STATE.set(State::Running);
 
     loop {
         info!("FPGA RunConstant");
@@ -96,10 +90,10 @@ pub async fn run_constant(r: &mut Fpga) {
 }
 
 pub async fn run_spiflash(r: &mut Fpga) {
-    set_state(State::Booting);
+    STATE.set(State::Booting);
     let _reset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::Low, Speed::Low);
 
-    set_state(State::SpiFlash);
+    STATE.set(State::SpiFlash);
 
     flash::turn_on();
 
@@ -107,12 +101,12 @@ pub async fn run_spiflash(r: &mut Fpga) {
 }
 
 pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
-    set_state(State::Booting);
+    STATE.set(State::Booting);
     let _creset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
     let mut cdone = ExtiInput::new(r.cdone.reborrow(), r.cdone_exti.reborrow(), Pull::None, Irqs);
 
     cdone.wait_for_high().await;
-    set_state(State::Running);
+    STATE.set(State::Running);
 
     let mut start_capture = OutputOpenDrain::new(r.gpio1.reborrow(), Level::Low, Speed::Low);
     let mut drdy = ExtiInput::new(r.drdy.reborrow(), r.drdy_exti.reborrow(), Pull::Up, Irqs);
@@ -161,11 +155,7 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
 
         info!("Turning on the camera");
         camera::turn_on();
-        poll::until(
-            || camera::get_state() == camera_::State::Running,
-            Duration::from_millis(50),
-        )
-        .await;
+        poll::until(camera::is_running, Duration::from_millis(50)).await;
     }
     Timer::after_millis(100).await;
 
@@ -194,7 +184,7 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
         let [_, _, addr_hi, addr_lo] = address.to_be_bytes();
 
         cs_n.set_low();
-        let to_tx = [spi_cmd::Command::Read as u8, addr_hi, addr_lo];
+        let to_tx = [spi_cmd::Command::ReadData as u8, addr_hi, addr_lo];
         let _ = SPI_TX_TO_SEND.try_send(to_tx.into());
         let _res = spi.write(&to_tx).await;
         let _res = spi.read(new_line.mut_data()).await;
@@ -207,20 +197,12 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
     }
 }
 
-fn set_state(state: State) {
-    STATE.lock(|s| s.set(state));
-}
-
-pub fn get_state() -> State {
-    STATE.lock(Cell::get)
-}
-
 pub fn handle_command(mut command: Command) {
     if let Some(action) = command.take_action() {
         debug!("FPGA received Action={:?}", Debug2Format(&action));
         match action {
             Action::Capture => {
-                if get_state() == State::Off
+                if STATE.is(State::Off)
                     && let Some(src) = command.take_capture_source()
                     && matches!(
                         src,
@@ -231,27 +213,26 @@ pub fn handle_command(mut command: Command) {
                 }
             }
             Action::SpiFlash => {
-                if get_state() == State::Off {
+                if STATE.is(State::Off) {
                     POWER_SIGNAL.turn_on(RunMode::SpiFlash);
                 }
             }
             Action::RunConstant => {
-                if get_state() == State::Off {
+                if STATE.is(State::Off) {
                     POWER_SIGNAL.turn_on(RunMode::RunConstant);
                 }
             }
             Action::Off => {
-                if get_state() != State::Off {
+                if !STATE.is(State::Off) {
                     POWER_SIGNAL.turn_off();
                 }
             }
-            #[allow(clippy::wildcard_in_or_patterns)]
-            Action::None | _ => (),
+            _ => (),
         }
     }
 
     if let Some(flash_cmd) = command.take_flash()
-        && matches!(get_state(), State::SpiFlash)
+        && STATE.is(State::SpiFlash)
     {
         flash::handle_command(flash_cmd);
     }
@@ -259,7 +240,7 @@ pub fn handle_command(mut command: Command) {
 
 pub fn get_status() -> Status {
     let mut s = Status::default()
-        .init_state(get_state())
+        .init_state(STATE.get())
         .init_flash(flash::get_status());
 
     if let Ok(line) = LINES_TO_SEND.try_receive() {

@@ -91,6 +91,7 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
             .init_tx_counter(state.tx_counter)
             .init_state(state_machine::get_state())
             .init_measurement(sensors::get_status())
+            .init_nvm(nvm::get_status())
             .init_alerts(0u64) // TODO: actual alerts
             .init_fpga(fpga::get_status())
             .init_camera(camera::get_status());

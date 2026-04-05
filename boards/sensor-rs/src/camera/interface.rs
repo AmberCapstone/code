@@ -1,16 +1,14 @@
 #![allow(unused)]
 
-mod reg;
-
-pub use reg::Reg;
+pub use sccb::Reg;
 
 pub(super) const ADDRESS: u8 = 0x21;
 
-pub struct SccbInterface<I2C: embedded_hal_async::i2c::I2c> {
+pub struct CameraInterface<I2C: embedded_hal_async::i2c::I2c> {
     i2c: I2C,
 }
 
-impl<I2C: embedded_hal_async::i2c::I2c> SccbInterface<I2C> {
+impl<I2C: embedded_hal_async::i2c::I2c> CameraInterface<I2C> {
     pub fn new(i2c: I2C) -> Self {
         Self { i2c }
     }

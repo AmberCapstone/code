@@ -19,7 +19,7 @@ fn main() -> Result<()> {
         "sensor/fpga/flash.proto",
         "sensor/fpga/image.proto",
         "sensor/measure.proto",
-        "sensor/parameters.proto",
+        "sensor/nvm.proto",
     ];
 
     for proto_file in &protos {

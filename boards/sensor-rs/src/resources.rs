@@ -7,7 +7,6 @@ assign_resources! {
     system: System {
         wdg: IWDG,
         rcc: RCC,
-        flash: FLASH,
     },
     state_machine: StateMachine {
         vbat_ok: PA9,
@@ -87,6 +86,9 @@ assign_resources! {
         tx: PA2,
         rx: PA3,
         carrier: PA8,
+    },
+    nvm: Nvm {
+        flash: FLASH,
     },
     spare: Spare {
         i2c: I2C1,
