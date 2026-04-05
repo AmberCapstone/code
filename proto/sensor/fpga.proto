@@ -10,6 +10,7 @@ enum State {
     STATE_OFF = 1;
     STATE_BOOTING = 2;
     STATE_RUNNING = 3;
+    STATE_DATA_READY = 4;
 
     STATE_SPI_FLASH = 14;
     STATE_LOW_POWER_IDLE = 15;
@@ -20,8 +21,6 @@ enum Action {
     ACTION_OFF = 1;
     ACTION_CAPTURE = 2;
     ACTION_SPI_FLASH = 3;
-
-    ACTION_RUN_CONSTANT = 15;
 }
 
 enum CaptureSource {
@@ -31,6 +30,12 @@ enum CaptureSource {
     CAPTURE_SOURCE_FAKE_SRAM = 3;
 }
 
+enum DataRequest {
+    DATA_REQUEST_NONE = 0;
+    DATA_REQUEST_IMAGE = 1;
+    DATA_REQUEST_VESSELS = 2;
+}
+
 message Status {
     State state = 1;
     flash.Status flash = 2;
@@ -38,6 +43,7 @@ message Status {
     optional image.Line line = 3;
     optional bytes spi_tx = 4;
     optional bytes spi_rx = 5;
+    optional Vessels vessels = 6;
 }
 
 message Command {
@@ -45,4 +51,15 @@ message Command {
     optional flash.Command flash = 3;
 
     optional CaptureSource capture_source = 4;
+    optional DataRequest data_request = 5;
+}
+
+message Vessels {
+    uint32 count = 1;
+    repeated Centroid centroids = 2;
+}
+
+message Centroid {
+    uint32 x = 1;
+    uint32 y = 2;
 }

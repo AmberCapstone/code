@@ -39,6 +39,7 @@ message Status {
     optional nvm.Status nvm = 6;
 
     // Diagnostics
+    optional uint32 last_capture_interval_ms = 12;
     optional string name = 13;
     optional uint32 tx_counter = 14;
     optional uint32 rx_counter = 15;

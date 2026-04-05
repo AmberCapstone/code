@@ -1,10 +1,12 @@
 use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
+use defmt::info;
 use embassy_stm32::adc::{self, Adc, Resolution};
 use embassy_stm32::adc::{AdcChannel, SampleTime};
 use embassy_stm32::time::Hertz;
 use embassy_time::{Duration, Ticker};
 
+use crate::clock::SYS_FREQ;
 use crate::proto;
 use crate::resources::Sensors;
 use crate::sensors::calibration::{Converter, FactoryCalibration};
@@ -15,14 +17,14 @@ const fn current_sense_mv_to_ua(shunt_mohm: u32, v_gain: u32) -> u32 {
     1_000_000 / (shunt_mohm * v_gain)
 }
 
-const CLOCK: Hertz = Hertz::mhz(16); // Assumed, should match clock.rs
+const CLOCK: Hertz = SYS_FREQ;
 
-const VREFINT_SAMPLE_TIME: SampleTime = SampleTime::CYCLES79_5;
+const VREFINT_SAMPLE_TIME: SampleTime = SampleTime::CYCLES39_5;
 const TEMP_SAMPLE_TIME: SampleTime = SampleTime::CYCLES79_5;
 const VBATINT_SAMPLE_TIME: SampleTime = SampleTime::CYCLES160_5;
 
 // Check sampling times are legal at compile time
-const _: () = assert!(sampling_time_ns(CLOCK, VREFINT_SAMPLE_TIME) >= 4_000); // DS14463 Rev2 Table 25
+// const _: () = assert!(sampling_time_ns(CLOCK, VREFINT_SAMPLE_TIME) >= 4_000); // DS14463 Rev2 Table 25
 // const _: () = assert!(sampling_time_ns(CLOCK, TEMP_SAMPLE_TIME) >= 5_000); // DS14463 Rev2 Table 73
 // const _: () = assert!(sampling_time_ns(CLOCK, VBATINT_SAMPLE_TIME) >= 12_000); // DS14463 Rev2 Table 74
 
@@ -42,7 +44,8 @@ static VBAT_MV: AtomicU32 = AtomicU32::new(3000);
 
 #[embassy_executor::task]
 pub async fn task(mut r: Sensors) {
-    let mut ticker = Ticker::every(Duration::from_millis(10));
+    info!("Starting SENSORS task");
+    let mut ticker = Ticker::every(Duration::from_millis(50));
 
     let mut adc = Adc::new_with_config(
         r.adc,

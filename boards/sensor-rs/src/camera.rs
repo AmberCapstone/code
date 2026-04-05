@@ -10,9 +10,9 @@ use embassy_stm32::{
 use embassy_time::Timer;
 use sccb::{self, Reg};
 
-use crate::power::PowerSignal;
 use crate::proto::sensor_::camera_::{State, Status};
 use crate::resources::{Camera, CameraPower, Irqs};
+use crate::{clock::MCO_CLOCKS, power::PowerSignal};
 use crate::{flow::StateLock, nvm};
 use interface::CameraInterface;
 
@@ -23,6 +23,7 @@ static POWER_SIGNAL: PowerSignal<()> = PowerSignal::new();
 
 #[embassy_executor::task]
 pub async fn task(r_power: CameraPower, mut r: Camera) {
+    info!("Starting CAMERA task");
     let mut power_en = Output::new(r_power.en, Level::Low, Speed::Low);
 
     POWER_SIGNAL.turn_off();
@@ -47,9 +48,9 @@ pub async fn run_fsm(r: &mut Camera) {
     let mut reset_n = OutputOpenDrain::new(r.reset_n.reborrow(), Level::High, Speed::Low);
     let _power_down = Output::new(r.pwrdn.reborrow(), Level::Low, Speed::Low);
 
-    let _mco = Mco::new(r.mco.reborrow(), r.xclk.reborrow(), McoSource::HSI48, {
+    let _mco = Mco::new(r.mco.reborrow(), r.xclk.reborrow(), MCO_CLOCKS.source, {
         let mut c = McoConfig::default();
-        c.prescaler = McoPrescaler::DIV4; // 12 MHz
+        c.prescaler = MCO_CLOCKS.camera_div;
         c.speed = Speed::VeryHigh;
         c
     });

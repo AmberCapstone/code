@@ -37,6 +37,7 @@ static READOUT_REQUEST: Signal<ThreadModeRawMutex, ()> = Signal::new();
 
 #[embassy_executor::task]
 pub async fn task(r: resources::Nvm) {
+    info!("Starting NVM task");
     let mut flash = flash::Flash::new_blocking(r.flash).into_blocking_regions().bank1_region;
 
     CURRENT_PARAMS.lock(|c| c.set(Some(read_parameters(&mut flash))));

@@ -1,7 +1,7 @@
 #![allow(clippy::struct_field_names, reason = "Names are clearer for the macro")]
 
 use assign_resources::assign_resources;
-use embassy_stm32::{Peri, bind_interrupts, dma, exti, i2c, interrupt, peripherals, usb};
+use embassy_stm32::{Peri, bind_interrupts, dma, exti, i2c, interrupt, peripherals, usart, usb};
 
 assign_resources! {
     system: System {
@@ -82,6 +82,8 @@ assign_resources! {
     comms: Comms {
         mco: MCO,
         uart: USART2,
+        tx_dma: DMA1_CH6,
+        rx_dma: DMA1_CH7,
 
         tx: PA2,
         rx: PA3,
@@ -132,6 +134,8 @@ bind_interrupts!(
         I2C2_3_4 => i2c::EventInterruptHandler<peripherals::I2C3>,
                     i2c::ErrorInterruptHandler<peripherals::I2C3>;
 
+        USART2_LPUART2 => usart::InterruptHandler<peripherals::USART2>;
+
         DMA1_CHANNEL1 => dma::InterruptHandler<peripherals::DMA1_CH1>;
 
         DMA1_CHANNEL2_3 => dma::InterruptHandler<peripherals::DMA1_CH2>,
@@ -139,6 +143,8 @@ bind_interrupts!(
 
         DMA1_CH4_7_DMA2_CH1_5_DMAMUX_OVR => dma::InterruptHandler<peripherals::DMA1_CH4>,
                                             dma::InterruptHandler<peripherals::DMA1_CH5>,
+                                            dma::InterruptHandler<peripherals::DMA1_CH6>,
+                                            dma::InterruptHandler<peripherals::DMA1_CH7>,
                                             dma::InterruptHandler<peripherals::DMA2_CH1>,
                                             dma::InterruptHandler<peripherals::DMA2_CH2>;
     }

@@ -16,6 +16,7 @@ pub enum Sequence {
     Toggle,
     Error,
     LowCharge,
+    Backscattering,
     Charging,
     On,
     Off,
@@ -41,9 +42,15 @@ impl Sequence {
                 Timer::after_millis(400).await;
             },
             Sequence::LowCharge => loop {
-                pulse_ms(led, 10).await;
+                pulse_ms(led, 2).await;
                 pending::<()>().await;
             },
+            Sequence::Backscattering => {
+                pulse_ms(led, 10).await;
+                Timer::after_millis(50).await;
+                pulse_ms(led, 10).await;
+                pending::<()>().await;
+            }
             Sequence::On => {
                 led.set_high();
                 pending::<()>().await;
@@ -66,7 +73,7 @@ impl Sequence {
 pub async fn led_task(r: resources::Leds) {
     let mut led = Output::new(r.debug_led, Level::High, embassy_stm32::gpio::Speed::Low);
 
-    let mut seq = Sequence::LowCharge;
+    let mut seq = Sequence::Off;
 
     info!("Starting LED task");
     loop {
@@ -77,5 +84,5 @@ pub async fn led_task(r: resources::Leds) {
 }
 
 pub fn send(s: Sequence) {
-    NEW_SEQUENCE.signal(s);
+    // NEW_SEQUENCE.signal(s);
 }

@@ -8,7 +8,7 @@ use embassy_stm32::{
     spi::{self, Spi},
     time::Hertz,
 };
-use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, channel::Channel};
+use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, channel::Channel, signal::Signal};
 use embassy_time::{Duration, Timer};
 use heapless::Vec;
 
@@ -16,7 +16,7 @@ use crate::{
     camera,
     flow::{StateLock, poll},
     power::PowerSignal,
-    proto::sensor_::fpga_::{Action, CaptureSource, Command, State, Status, image_},
+    proto::sensor_::fpga_::{Action, CaptureSource, Centroid, Command, DataRequest, State, Status, Vessels, image_},
     resources::{Fpga, FpgaPower, Irqs},
 };
 
@@ -24,9 +24,8 @@ pub mod flash;
 mod spi_cmd;
 
 enum RunMode {
-    Capture(CaptureSource),
+    Capture(CaptureSource, DataRequest),
     SpiFlash,
-    RunConstant,
 }
 
 const NUM_LINES: u32 = 240; // for QVGA
@@ -37,11 +36,13 @@ const SPI_PROTO_MAX_BYTES: usize = 64; // match fpga.toml
 static STATE: StateLock<State> = StateLock::new(State::Off);
 static POWER_SIGNAL: PowerSignal<RunMode> = PowerSignal::new();
 static LINES_TO_SEND: Channel<ThreadModeRawMutex, image_::Line, 2> = Channel::new();
+static VESSELS_TO_SEND: Signal<ThreadModeRawMutex, Vessels> = Signal::new();
 static SPI_TX_TO_SEND: Channel<ThreadModeRawMutex, Vec<u8, SPI_PROTO_MAX_BYTES>, 8> = Channel::new();
 static SPI_RX_TO_SEND: Channel<ThreadModeRawMutex, Vec<u8, SPI_PROTO_MAX_BYTES>, 8> = Channel::new();
 
 #[embassy_executor::task]
 pub async fn task(r_power: FpgaPower, mut r_fpga: Fpga) {
+    info!("Starting FPGA task");
     let mut power_en = Output::new(r_power.en, Level::Low, Speed::Low);
 
     POWER_SIGNAL.turn_off();
@@ -62,30 +63,11 @@ pub async fn task(r_power: FpgaPower, mut r_fpga: Fpga) {
 
         select(POWER_SIGNAL.wait_for_off(), async {
             match mode {
-                RunMode::Capture(src) => run_capture(&mut r_fpga, src).await,
+                RunMode::Capture(src, data_request) => run_capture(&mut r_fpga, src, data_request).await,
                 RunMode::SpiFlash => run_spiflash(&mut r_fpga).await,
-                RunMode::RunConstant => run_constant(&mut r_fpga).await,
             }
         })
         .await;
-    }
-}
-
-pub async fn run_constant(r: &mut Fpga) {
-    STATE.set(State::Booting);
-    let mut _reset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
-    let mut cdone = ExtiInput::new(r.cdone.reborrow(), r.cdone_exti.reborrow(), Pull::None, Irqs);
-
-    info!("Waiting for CDONE");
-    #[cfg(not(feature = "nucleo"))]
-    cdone.wait_for_high().await;
-    info!("CDONE complete");
-
-    STATE.set(State::Running);
-
-    loop {
-        info!("FPGA RunConstant");
-        Timer::after_millis(2000).await;
     }
 }
 
@@ -100,7 +82,7 @@ pub async fn run_spiflash(r: &mut Fpga) {
     pending::<()>().await; // wait for a command to turn it off
 }
 
-pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
+pub async fn run_capture(r: &mut Fpga, src: CaptureSource, data_request: DataRequest) {
     STATE.set(State::Booting);
     let _creset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
     let mut cdone = ExtiInput::new(r.cdone.reborrow(), r.cdone_exti.reborrow(), Pull::None, Irqs);
@@ -167,6 +149,7 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
 
     info!("Waiting for drdy");
     drdy.wait_for_high().await;
+    STATE.set(State::DataReady);
     info!("Seen DRDY");
 
     if src == CaptureSource::Camera {
@@ -174,27 +157,94 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource) {
         camera::turn_off();
     }
 
-    for line_no in 0..NUM_LINES {
-        info!("Line no {}", line_no);
-        let mut new_line = image_::Line::default()
-            .init_number(line_no)
-            .init_data([0u8; LINE_LEN as usize].into());
+    match data_request {
+        DataRequest::Image => {
+            info!("Reading Image");
+            for line_no in 0..NUM_LINES {
+                info!("Line no {}", line_no);
+                let mut new_line = image_::Line::default()
+                    .init_number(line_no)
+                    .init_data([0u8; LINE_LEN as usize].into());
 
-        let address = line_no * LINE_LEN / BYTE_PER_ADDR;
-        let [_, _, addr_hi, addr_lo] = address.to_be_bytes();
+                let address = line_no * LINE_LEN / BYTE_PER_ADDR;
+                let [_, _, addr_hi, addr_lo] = address.to_be_bytes();
 
-        cs_n.set_low();
-        let to_tx = [spi_cmd::Command::ReadData as u8, addr_hi, addr_lo];
-        let _ = SPI_TX_TO_SEND.try_send(to_tx.into());
-        let _res = spi.write(&to_tx).await;
-        let _res = spi.read(new_line.mut_data()).await;
+                cs_n.set_low();
+                let to_tx = [spi_cmd::Command::ReadData as u8, addr_hi, addr_lo];
+                let _ = SPI_TX_TO_SEND.try_send(to_tx.into());
+                let _res = spi.write(&to_tx).await;
+                let _res = spi.read(new_line.mut_data()).await;
 
-        // Only send the first 64 bytes of image data
-        let _ = SPI_RX_TO_SEND.try_send(Vec::from_slice(&new_line.data()[0..SPI_PROTO_MAX_BYTES]).unwrap());
-        cs_n.set_high();
+                // Only send the first 64 bytes of image data
+                let _ = SPI_RX_TO_SEND.try_send(Vec::from_slice(&new_line.data()[0..SPI_PROTO_MAX_BYTES]).unwrap());
+                cs_n.set_high();
 
-        LINES_TO_SEND.send(new_line).await; // blocks until channel has capacity
+                #[cfg(feature = "usb")]
+                LINES_TO_SEND.send(new_line).await; // blocks until channel has capacity
+            }
+        }
+        DataRequest::Vessels => {
+            info!("Reading Vessels");
+            cs_n.set_low();
+            let to_tx = [spi_cmd::Command::GetVessels as u8];
+            let _ = SPI_TX_TO_SEND.try_send(to_tx.into());
+            let _res = spi.write(&to_tx).await;
+
+            let mut discard = [0u8];
+            let _res = spi.read(&mut discard).await;
+            let mut buffer = [0u8; 21];
+            let _res = spi.read(&mut buffer).await;
+            let _ = SPI_RX_TO_SEND.try_send(buffer.into());
+            cs_n.set_high();
+
+            // Unpack the bytes to a Vessels struct
+            let v = Vessels {
+                count: u32::from(buffer[0]),
+                centroids: [
+                    Centroid {
+                        x: u32::from(u16::from_le_bytes(buffer[1..3].try_into().unwrap())),
+                        y: u32::from(u16::from_le_bytes(buffer[3..5].try_into().unwrap())),
+                    },
+                    Centroid {
+                        x: u32::from(u16::from_le_bytes(buffer[5..7].try_into().unwrap())),
+                        y: u32::from(u16::from_le_bytes(buffer[7..9].try_into().unwrap())),
+                    },
+                    Centroid {
+                        x: u32::from(u16::from_le_bytes(buffer[9..11].try_into().unwrap())),
+                        y: u32::from(u16::from_le_bytes(buffer[11..13].try_into().unwrap())),
+                    },
+                    Centroid {
+                        x: u32::from(u16::from_le_bytes(buffer[13..15].try_into().unwrap())),
+                        y: u32::from(u16::from_le_bytes(buffer[15..17].try_into().unwrap())),
+                    },
+                    Centroid {
+                        x: u32::from(u16::from_le_bytes(buffer[17..19].try_into().unwrap())),
+                        y: u32::from(u16::from_le_bytes(buffer[19..21].try_into().unwrap())),
+                    },
+                ]
+                .into(),
+            };
+
+            #[cfg(feature = "usb")]
+            VESSELS_TO_SEND.signal(v);
+            Timer::after_millis(100).await; // hacky way to hold data ready
+        }
+        _ => (),
     }
+}
+
+pub fn capture(data: DataRequest) {
+    if STATE.is(State::Off) {
+        POWER_SIGNAL.turn_on(RunMode::Capture(CaptureSource::Camera, data));
+    }
+}
+
+pub fn turn_off() {
+    POWER_SIGNAL.turn_off();
+}
+
+pub fn is_done() -> bool {
+    STATE.is(State::DataReady)
 }
 
 pub fn handle_command(mut command: Command) {
@@ -209,17 +259,13 @@ pub fn handle_command(mut command: Command) {
                         CaptureSource::Camera | CaptureSource::FakeVga | CaptureSource::FakeSram
                     )
                 {
-                    POWER_SIGNAL.turn_on(RunMode::Capture(src));
+                    let data_request = command.take_data_request().unwrap_or(DataRequest::Vessels);
+                    POWER_SIGNAL.turn_on(RunMode::Capture(src, data_request));
                 }
             }
             Action::SpiFlash => {
                 if STATE.is(State::Off) {
                     POWER_SIGNAL.turn_on(RunMode::SpiFlash);
-                }
-            }
-            Action::RunConstant => {
-                if STATE.is(State::Off) {
-                    POWER_SIGNAL.turn_on(RunMode::RunConstant);
                 }
             }
             Action::Off => {
@@ -253,6 +299,10 @@ pub fn get_status() -> Status {
 
     if let Ok(rx) = SPI_RX_TO_SEND.try_receive() {
         s.set_spi_rx(rx);
+    }
+
+    if let Some(vessels) = VESSELS_TO_SEND.try_take() {
+        s.set_vessels(vessels);
     }
 
     s

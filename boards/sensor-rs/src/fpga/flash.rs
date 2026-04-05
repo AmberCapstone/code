@@ -70,6 +70,7 @@ static READOUT_PAGE: Watch<ThreadModeRawMutex, Page, 1> = Watch::new();
 
 #[embassy_executor::task]
 pub async fn task(mut r: Flash) {
+    info!("Starting FLASH task");
     POWER_SIGNAL.turn_off();
 
     #[allow(clippy::never_loop)]

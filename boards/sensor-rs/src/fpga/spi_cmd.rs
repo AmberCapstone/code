@@ -8,5 +8,5 @@ pub enum Command {
     FakeCaptureWrite = 0x03,
     FakeCaptureVga = 0x04,
     RealCapture = 0x05,
-    GetCentroids = 0x06, // return [num, x1l, x1h, y1l, y1h..., x5l, x5h, y5l, y5h] - 21 bytes
+    GetVessels = 0x06, // return [num, x1l, x1h, y1l, y1h..., x5l, x5h, y5l, y5h] - 21 bytes
 }
