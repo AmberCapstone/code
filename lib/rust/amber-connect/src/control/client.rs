@@ -145,7 +145,7 @@ pub enum ClientError {
     #[error("the server responded incorrectly")]
     WrongResponse,
 
-    #[error("the client's request was misformed")]
+    #[error("the client's request was malformed")]
     InvalidRequest,
 
     #[error("timed out waiting on server response")]

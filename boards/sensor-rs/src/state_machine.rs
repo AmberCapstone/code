@@ -1,18 +1,16 @@
-use core::cell::Cell;
-
 use crate::{
-    camera,
-    flow::ChangeSignal,
+    camera, comms, debug_led,
+    flow::{ChangeSignal, StateLock},
     fpga::{self, flash},
+    nvm,
     proto::sensor_::{self, Action, State, fpga_},
     resources::{self, Irqs},
     sensors,
 };
 
-use defmt::{Debug2Format, info};
+use defmt::info;
 use embassy_futures::select::select;
 use embassy_stm32::{exti::ExtiInput, gpio::Pull};
-use embassy_sync::{blocking_mutex::Mutex, blocking_mutex::raw::ThreadModeRawMutex};
 use embassy_time::Timer;
 
 const MIN_CAPTURE_VBAT_MV: u32 = 4800;
@@ -24,7 +22,7 @@ enum NormalState {
 }
 
 static NORMAL_STATE: ChangeSignal<NormalState> = ChangeSignal::new(NormalState::Monitor);
-static STATE: Mutex<ThreadModeRawMutex, Cell<State>> = Mutex::new(Cell::new(State::LowCharge));
+static STATE: StateLock<State> = StateLock::new(State::LowCharge);
 
 #[embassy_executor::task]
 pub async fn task(r: resources::StateMachine) {
@@ -46,12 +44,14 @@ pub async fn task(r: resources::StateMachine) {
 }
 
 async fn low_power_loop() -> ! {
-    set_state(State::LowCharge);
+    STATE.set(State::LowCharge);
     fpga::handle_command(fpga_::Command::default().init_action(fpga_::Action::Off));
     loop {
         info!("In low_power_loop()");
-        Timer::after_millis(2000).await;
+        debug_led::send(debug_led::Sequence::LowCharge);
+        comms::send(());
         // Send a message over serial
+        Timer::after_millis(1000).await;
     }
 }
 
@@ -65,26 +65,21 @@ async fn normal_loop() -> ! {
     }
 }
 
+pub fn get_state() -> State {
+    STATE.get()
+}
+
 async fn manual_loop() -> ! {
-    set_state(State::Manual);
+    STATE.set(State::Manual);
     loop {
-        info!(
-            "MANUAL, FPGA = {:?}, FLASH = {:?}",
-            Debug2Format(&fpga::get_state()),
-            Debug2Format(&flash::get_state())
-        );
+        info!("In manual_loop()");
         Timer::after_millis(2000).await;
     }
 }
 
 async fn monitor() -> ! {
     loop {
-        info!(
-            "MONITOR, FPGA = {:?}, FLASH = {:?}",
-            Debug2Format(&fpga::get_state()),
-            Debug2Format(&flash::get_state())
-        );
-        set_state(State::Charging);
+        STATE.set(State::Charging);
 
         // while sensors::get_vbat_mv() < MIN_CAPTURE_VBAT_MV {
         //     Timer::after_millis(100).await;
@@ -97,23 +92,19 @@ async fn monitor() -> ! {
     }
 }
 
-fn set_state(state: State) {
-    STATE.lock(|s| s.set(state));
-}
-
-pub fn get_state() -> State {
-    STATE.lock(Cell::get)
-}
-
 pub fn handle_command(mut command: sensor_::Command) {
     if let Some(action) = command.take_action() {
         handle_action(action);
     }
 
-    if let Some(cmd) = command.take_fpga()
-        && matches!(get_state(), State::Manual)
-    {
-        fpga::handle_command(cmd);
+    if STATE.is(State::Manual) {
+        if let Some(cmd) = command.take_fpga() {
+            fpga::handle_command(cmd);
+        }
+
+        if let Some(cmd) = command.take_nvm() {
+            nvm::handle_command(cmd);
+        }
     }
 }
 

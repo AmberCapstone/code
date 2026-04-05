@@ -29,8 +29,8 @@ async fn main() -> anyhow::Result<()> {
 
     let db = influx::InfluxConfig {
         measurement: "sensor".to_string(),
-        org: "amber".to_string(),
-        bucket: "capstone".to_string(),
+        org: env!("INFLUX_ORG").to_string(),
+        bucket: env!("INFLUX_BUCKET").to_string(),
         address: amber_connect::endpoint::INFLUX.to_string(),
         token: Some(env!("INFLUX_TOKEN").to_string()),
         tags: Vec::new(),
@@ -48,7 +48,8 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .rule("measurement.*Ua", LogPolicy::EveryMeasurement)
                 .rule("*state*", LogPolicy::on_change(Duration::from_millis(500)))
-                .rule("name", LogPolicy::on_change(Duration::from_secs(60))),
+                .rule("name", LogPolicy::on_change(Duration::from_secs(60)))
+                .rule("sensor.nvm.parameters", LogPolicy::EveryMeasurement), // only present during NVM actions
         );
 
     let r = tokio::select! {

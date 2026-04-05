@@ -1,0 +1,16 @@
+[package]
+name = "sccb"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0.228", optional = true }
+strum = { version = "0.28.0", default-features = false, features = ["derive"] }
+
+[lints]
+workspace = true
+
+[features]
+serde = ["dep:serde"]
+hash = []
+no-std = []

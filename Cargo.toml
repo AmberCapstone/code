@@ -6,12 +6,14 @@ members = [
     "apps/dashboard/backend",
     "apps/db-logger",
     "apps/flasher",
+    "apps/nvmedit",
     "apps/sensor-server",
     "apps/spiview",
     "lib/rust/amber-connect",
     "lib/rust/flash-layout",
     "lib/rust/influx",
     "lib/rust/proto",
+    "lib/rust/sccb",
     "lib/rust/serial",
 ]
 
