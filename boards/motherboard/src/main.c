@@ -25,6 +25,7 @@
 #include "gpio.h"
 #include "spi.h"
 #include "tim.h"
+#include "usart.h"
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -51,6 +52,8 @@
 
 /* USER CODE BEGIN PV */
 int pwr_down_flag = 0;
+uint8_t uartByte = 1;
+uint8_t uartReceiveCount = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -98,6 +101,7 @@ int main(void) {
     MX_SPI2_Init();
     MX_SPI3_Init();
     MX_TIM2_Init();
+    MX_USART3_UART_Init();
     /* USER CODE BEGIN 2 */
     MX_USB_Device_Init();
     /* USER CODE END 2 */

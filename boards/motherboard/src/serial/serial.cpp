@@ -1,5 +1,8 @@
 #include "serial.hpp"
 
+#include "Src/backscatter/backscatter.hpp"
+#include "Src/power/power.hpp"
+#include "Src/thermal/thermal.hpp"
 #include "cobs.hpp"
 #include "common_macros.hpp"
 
@@ -34,15 +37,15 @@ static amber::cobs::Decoder<1024> rx_decoder;
 // TX State
 static uint8_t tx_counter = 0;
 static uint8_t pb_buffer[BASE_STATION_STATUS_SIZE];
-static uint8_t cobs_buffer[amber::cobs::MaxEncodedLength(BASE_STATION_STATUS_SIZE)];
+static uint8_t
+    cobs_buffer[amber::cobs::MaxEncodedLength(BASE_STATION_STATUS_SIZE)];
 
 static base_station_command_t last_command;
 
 static void HandleCommand(base_station_command_t* cmd);
 static void SendStatus(void);
 
-void Init(void) {
-}
+void Init(void) {}
 
 void Update_100hz(void) {
     SendStatus();
@@ -70,9 +73,15 @@ void Receive(void) {
 void SendStatus(void) {
     base_station_status_t status = BASE_STATION_STATUS_INIT_ZERO;
     status.has_tx_counter = true;
-    status.tx_counter = tx_counter;
+    status.tx_counter = tx_counter++;
     status.has_rx_counter = true;
     status.rx_counter = rx_counter;
+    status.has_temperature = true;
+    status.temperature = thermal::GetCarrierTemp();
+    status.has_uart_byte = true;
+    status.uart_byte = backscatter::GetUartByte();
+    status.has_uart_receive_count = true;
+    status.uart_receive_count = backscatter::GetReceiveCount();
 
     pb_ostream_s ostream =
         pb_ostream_from_buffer(pb_buffer, COUNTOF(pb_buffer));

@@ -4,7 +4,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use futures::FutureExt;
-use proto::sensor::{Command, Status};
+use proto::base_station::{Command, Status};
 use ratatui::{
     Terminal,
     prelude::CrosstermBackend,

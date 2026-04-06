@@ -57,6 +57,7 @@
 
 /* External variables --------------------------------------------------------*/
 extern PCD_HandleTypeDef hpcd_USB_DRD_FS;
+extern UART_HandleTypeDef huart3;
 extern TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN EV */
@@ -137,6 +138,20 @@ void TIM1_BRK_UP_TRG_COM_IRQHandler(void) {
     /* USER CODE BEGIN TIM1_BRK_UP_TRG_COM_IRQn 1 */
 
     /* USER CODE END TIM1_BRK_UP_TRG_COM_IRQn 1 */
+}
+
+/**
+ * @brief This function handles USART3, USART4, USART5, USART6, LPUART1 globlal
+ * Interrupts (combined with EXTI 28).
+ */
+void USART3_4_5_6_LPUART1_IRQHandler(void) {
+    /* USER CODE BEGIN USART3_4_5_6_LPUART1_IRQn 0 */
+
+    /* USER CODE END USART3_4_5_6_LPUART1_IRQn 0 */
+    HAL_UART_IRQHandler(&huart3);
+    /* USER CODE BEGIN USART3_4_5_6_LPUART1_IRQn 1 */
+
+    /* USER CODE END USART3_4_5_6_LPUART1_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

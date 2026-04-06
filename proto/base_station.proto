@@ -11,4 +11,7 @@ message Status {
     // Diagnostics
     optional uint32 tx_counter = 14;
     optional uint32 rx_counter = 15;
+    optional float temperature = 16;
+    optional uint32 uart_byte = 17;
+    optional uint32 uart_receive_count = 18;
 }

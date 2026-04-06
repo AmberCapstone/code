@@ -51,17 +51,6 @@ struct Spi {
         return status;
     }
 
-    auto transmitThenReceive(const uint8_t* tx, uint16_t txLen,
-                            uint8_t* rx, uint16_t rxLen) noexcept -> HAL_StatusTypeDef {
-        csAssert();
-        auto status = HAL_SPI_Transmit(&_hspi, const_cast<uint8_t*>(tx), txLen, HAL_MAX_DELAY);
-        if (status == HAL_OK) {
-            status = HAL_SPI_Receive(&_hspi, rx, rxLen, HAL_MAX_DELAY);
-        }
-        csRelease();
-        return status;
-    }
-
 private:
     void csAssert() {
         _csPin.SetLow();

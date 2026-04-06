@@ -1,13 +1,14 @@
 #include "tasks.hpp"
 
 #include "FreeRTOS.h"
+#include "backscatter/backscatter.hpp"
 #include "carrier/carrier.hpp"
 #include "lib/periph/digital.hpp"
 #include "main.h"
 #include "power/power.hpp"
+#include "serial/serial.hpp"
 #include "task.h"
 #include "thermal/thermal.hpp"
-#include "serial/serial.hpp"
 #include "tim.h"
 
 enum {
@@ -37,6 +38,7 @@ auto task_1000hz(void* argument) -> void {
 
     while (true) {
         serial::Receive();
+        backscatter::Update1000hz();
         vTaskDelayUntil(&wake_time, pdMS_TO_TICKS(1));
     }
 }
@@ -79,10 +81,11 @@ auto task_1hz(void* argument) -> void {
 };
 
 auto MX_FREERTOS_Init() -> void {
-    serial::Init();
     power::Init();
+    backscatter::Init();
     carrier::Init();
     thermal::Init();
+    serial::Init();
 
     xTaskCreateStatic(task_1hz, "1Hz", STACK_SIZE_WORDS, NULL, PRIORITY_1HZ,
                       t1hz_stack, &t1hz_ctrl);

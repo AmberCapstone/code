@@ -11,7 +11,14 @@
 namespace {
 
 static amber::periph::DigitalOutput lpaEn(*LPA_EN_GPIO_Port, LPA_EN_Pin);
+static amber::periph::DigitalOutput lnaEn(*LNA_EN_GPIO_Port, LNA_EN_Pin);
+static amber::periph::DigitalOutput logampEn(*LOGAMP_EN_GPIO_Port,
+                                             LOGAMP_EN_Pin);
 static amber::periph::DigitalOutput vcoCe(*VCO_CE_GPIO_Port, VCO_CE_Pin);
+static amber::periph::DigitalOutput fan1En(*FAN1_PWR_EN_GPIO_Port,
+                                           FAN1_PWR_EN_Pin);
+static amber::periph::DigitalOutput fan1Pwm(*FAN1_PWN_GPIO_Port, FAN1_PWN_Pin);
+static amber::periph::DigitalOutput vgaEn(*VGA_EN_GPIO_Port, VGA_EN_Pin);
 static amber::periph::DigitalInput vcoMuxOut(*VCO_MUXOUT_GPIO_Port,
                                              VCO_MUXOUT_Pin);
 static amber::periph::AnalogInput lpaPowerDetect(hadc1, ADC_CHANNEL_7);
@@ -36,13 +43,13 @@ auto ADF5355() -> amber::adf5355::Driver& {
 namespace carrier {
 
 auto Init() noexcept -> void {
-    if (power::GetPowerMuxState() == power::PowerMuxState::USB_POWER) {
-        lpaEn.SetLow();
-        vcoCe.SetLow();
-    }
-
     lpaEn.SetHigh();
+    lnaEn.SetHigh();
+    logampEn.SetLow();
+    fan1En.SetHigh();
+    fan1Pwm.SetHigh();
     vcoCe.SetHigh();
+    vgaEn.SetHigh();
 
     HAL_Delay(10);
 
@@ -52,10 +59,21 @@ auto Init() noexcept -> void {
 auto Update_100hz() noexcept -> void {
     vcoLocked = vcoMuxOut.Read();
 
-    if (power::GetPowerMuxState() == power::PowerMuxState::USB_POWER) {
+    if (powerOffRequested) {
         lpaEn.SetLow();
+        lnaEn.SetLow();
         vcoCe.SetLow();
+        fan1En.SetLow();
+        logampEn.SetHigh();
+        vgaEn.SetLow();
         return;
+    } else {
+        lpaEn.SetHigh();
+        lnaEn.SetHigh();
+        vcoCe.SetHigh();
+        fan1En.SetHigh();
+        logampEn.SetLow();
+        vgaEn.SetHigh();
     }
 
     if (pwr_down_flag) {

@@ -2,6 +2,7 @@
 
 #include <array>
 
+#include "Src/power/power.hpp"
 #include "lib/tmp126/tmp126.hpp"
 #include "periph/pwm.hpp"
 #include "spi.h"
@@ -16,7 +17,7 @@ static amber::periph::DigitalOutput fan2En(*FAN2_PWR_EN_GPIO_Port,
                                            FAN2_PWR_EN_Pin);
 
 static amber::periph::Pwm fan2Pwm(htim2, TIM_CHANNEL_4);
-static amber::periph::Spi tempSpi(hspi2, tempCs);
+static amber::periph::Spi tempSpi(hspi3, tempCs);
 
 static amber::tmp126::Driver tempSensor(tempSpi, amber::tmp126::Config{});
 static bool tempSensorReady = false;
@@ -25,6 +26,7 @@ constexpr float kAlpha = 0.1f;  // EMA smoothing factor
 constexpr uint8_t kTempRegions = 5;
 
 float filteredTemp = 0.0f;
+float lastReading = 0.0f;
 
 struct Point {
     float temperature;
@@ -32,7 +34,7 @@ struct Point {
 };
 
 constexpr std::array<Point, 5> kThermalCurve{{
-    {40.0f, 0},
+    {40.0f, 10},
     {55.0f, 25},
     {70.0f, 55},
     {85.0f, 85},
@@ -66,30 +68,32 @@ auto LookupDuty(float temp) -> uint8_t {
 
 auto Init() noexcept -> void {
     filteredTemp = 25.0f;
+
     fan2En.SetHigh();
     fan2Pwm.Start();
-    fan2Pwm.SetDutyCycle(0.0f);
+    fan2Pwm.SetDutyCycle(100.0f);
 
-    tempSensorReady = (tempSensor.init() == amber::tmp126::Status::OK);
-    if (!tempSensorReady) {
-        fan2Pwm.SetDutyCycle(100.0f);
-    }
+    // tempSensorReady = (tempSensor.init() == amber::tmp126::Status::OK);
+    // if (!tempSensorReady) {
+    //     fan2Pwm.SetDutyCycle(100.0f);
+    // }
 };
 
 auto Update10Hz() noexcept -> void {
-    if (!tempSensorReady) {
-        return;
+    if (pwr_down_flag) {
+        fan2Pwm.SetDutyCycle(50.0f);
     }
+    // const auto [status, temperature] = tempSensor.readTemperature();
+    // if (status != amber::tmp126::Status::OK) {
+    //     tempSensorReady = false;
+    //     fan2Pwm.SetDutyCycle(100.0f);
+    //     return;
+    // }
 
-    const auto [status, temperature] = tempSensor.readTemperature();
-    if (status != amber::tmp126::Status::OK) {
-        tempSensorReady = false;
-        fan2Pwm.SetDutyCycle(100.0f);
-        return;
-    }
+    // lastReading = temperature;
 
-    filteredTemp += kAlpha * (temperature - filteredTemp);
-    fan2Pwm.SetDutyCycle(LookupDuty(filteredTemp));
+    // filteredTemp += kAlpha * (temperature - filteredTemp);
+    // fan2Pwm.SetDutyCycle(LookupDuty(filteredTemp));
 };
 
 auto GetCarrierTemp() noexcept -> float {

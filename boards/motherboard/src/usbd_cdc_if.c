@@ -98,9 +98,6 @@ uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
 /* USER CODE BEGIN PRIVATE_VARIABLES */
-static char cdcCommandBuffer[32];
-static uint8_t cdcCommandLength = 0;
-
 /* USER CODE END PRIVATE_VARIABLES */
 
 /**
@@ -135,9 +132,6 @@ static int8_t CDC_Receive_FS(uint8_t* pbuf, uint32_t* Len);
 static int8_t CDC_TransmitCplt_FS(uint8_t* pbuf, uint32_t* Len, uint8_t epnum);
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_DECLARATION */
-static void CDC_ProcessCommand(const char* command);
-static void CDC_SendTemperature(void);
-
 /* USER CODE END PRIVATE_FUNCTIONS_DECLARATION */
 
 /**
@@ -321,35 +315,6 @@ static int8_t CDC_TransmitCplt_FS(uint8_t* Buf, uint32_t* Len, uint8_t epnum) {
 }
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
-
-static void CDC_ProcessCommand(const char* command) {
-    if (strcmp(command, "temp") == 0 || strcmp(command, "temp?") == 0) {
-        CDC_SendTemperature();
-        return;
-    }
-
-    static uint8_t unknownResponse[] = "ERR unknown command\r\n";
-    (void)CDC_Transmit_FS(unknownResponse, sizeof(unknownResponse) - 1U);
-}
-
-static void CDC_SendTemperature(void) {
-    const float temperature = Thermal_GetCarrierTempC();
-    const int32_t centiC = (int32_t)(temperature * 100.0f +
-                                     ((temperature >= 0.0f) ? 0.5f : -0.5f));
-    const int32_t whole = centiC / 100;
-    const int32_t fractional = (centiC < 0 ? -centiC : centiC) % 100;
-
-    static uint8_t response[32];
-    const int length =
-        snprintf((char*)response, sizeof(response), "TEMP %ld.%02ld C\r\n",
-                 (long)whole, (long)fractional);
-    if (length <= 0) {
-        return;
-    }
-
-    (void)CDC_Transmit_FS(response, (uint16_t)length);
-}
-
 /* USER CODE END PRIVATE_FUNCTIONS_IMPLEMENTATION */
 
 /**
