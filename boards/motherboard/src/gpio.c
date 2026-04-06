@@ -64,7 +64,7 @@ void MX_GPIO_Init(void) {
                       GPIO_PIN_RESET);
 
     /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(FAN1_PWN_GPIO_Port, FAN1_PWN_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(FAN1_PWM_GPIO_Port, FAN1_PWM_Pin, GPIO_PIN_RESET);
 
     /*Configure GPIO pin Output Level */
     HAL_GPIO_WritePin(GPIOD,
@@ -125,12 +125,12 @@ void MX_GPIO_Init(void) {
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-    /*Configure GPIO pin : FAN1_PWN_Pin */
-    GPIO_InitStruct.Pin = FAN1_PWN_Pin;
+    /*Configure GPIO pin : FAN1_PWM_Pin */
+    GPIO_InitStruct.Pin = FAN1_PWM_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(FAN1_PWN_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(FAN1_PWM_GPIO_Port, &GPIO_InitStruct);
 
     /*Configure GPIO pins : LPA_EN_Pin VGA_ATTSEL0_Pin VGA_EN_Pin
        VGA_ATTSEL1_Pin P12V_HSD_DIAG_EN_Pin FAN1_PWR_EN_Pin FAN2_PWR_EN_Pin

@@ -22,6 +22,11 @@ message ThermalStatus {
     float fan_duty_percent = 1;
 }
 
+message CarrierStatus {
+    bool vco_locked = 1;
+    float lpa_power_detect = 2; // V
+}
+
 message HsdCurrents {
     float channel_1 = 1; // mA
     float channel_2 = 2; // mA
@@ -42,4 +47,5 @@ message Status {
     DebugStatus debug = 1;
     ThermalStatus thermal = 2;
     PowerStatus power = 3;
+    CarrierStatus carrier = 4;
 }

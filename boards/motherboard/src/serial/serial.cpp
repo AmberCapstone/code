@@ -86,6 +86,10 @@ void SendStatus(void) {
     status.has_thermal = true;
     status.thermal.fan_duty_percent = thermal::GetCurrentFanDuty();
 
+    status.has_carrier = true;
+    status.carrier.vco_locked = carrier::GetVcoLocked();
+    status.carrier.lpa_power_detect = carrier::GetLpaPowerDetect();
+
     status.has_power = true;
     status.power.mux_state =
         static_cast<base_station_power_mux_state_t>(power::GetPowerMuxState());

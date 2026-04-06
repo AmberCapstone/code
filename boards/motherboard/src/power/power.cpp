@@ -136,13 +136,6 @@ auto P12VHsd() -> amber::tps1h100::Driver& {
 namespace power {
 
 auto Init() noexcept -> void {
-    // if (GetPowerMuxState() == PowerMuxState::USB_POWER) {
-    //     P6VHsd1().disableAll();
-    //     P6VHsd2().disableAll();
-    //     P6VScatter().disable();
-    //     return;
-    // }
-
     P6VHsd1().enableAll();
     P6VHsd2().enableAll();
     P6VScatter().enable();

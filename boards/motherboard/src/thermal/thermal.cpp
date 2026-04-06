@@ -62,7 +62,8 @@ static float currentDuty = 0.0f;
 //         if (temp >= p1.temperature && temp <= p2.temperature) {
 //             float ratio =
 //                 (temp - p1.temperature) / (p2.temperature - p1.temperature);
-//             return static_cast<uint8_t>(p1.duty + ratio * (p2.duty - p1.duty));
+//             return static_cast<uint8_t>(p1.duty + ratio * (p2.duty -
+//             p1.duty));
 //         }
 //     }
 

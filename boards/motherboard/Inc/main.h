@@ -94,8 +94,8 @@ void Error_Handler(void);
 #define DEBUG1_GPIO_Port GPIOE
 #define P12V_CS_Pin GPIO_PIN_10
 #define P12V_CS_GPIO_Port GPIOB
-#define FAN1_PWN_Pin GPIO_PIN_9
-#define FAN1_PWN_GPIO_Port GPIOA
+#define FAN1_PWM_Pin GPIO_PIN_9
+#define FAN1_PWM_GPIO_Port GPIOA
 #define WARN_LIGHT_Pin GPIO_PIN_6
 #define WARN_LIGHT_GPIO_Port GPIOC
 #define FAN2_PWM_Pin GPIO_PIN_7

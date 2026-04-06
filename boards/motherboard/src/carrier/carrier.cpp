@@ -17,14 +17,19 @@ static amber::periph::DigitalOutput logampEn(*LOGAMP_EN_GPIO_Port,
 static amber::periph::DigitalOutput vcoCe(*VCO_CE_GPIO_Port, VCO_CE_Pin);
 static amber::periph::DigitalOutput fan1En(*FAN1_PWR_EN_GPIO_Port,
                                            FAN1_PWR_EN_Pin);
-static amber::periph::DigitalOutput fan1Pwm(*FAN1_PWN_GPIO_Port, FAN1_PWN_Pin);
+static amber::periph::DigitalOutput fan1Pwm(*FAN1_PWM_GPIO_Port, FAN1_PWM_Pin);
 static amber::periph::DigitalOutput vgaEn(*VGA_EN_GPIO_Port, VGA_EN_Pin);
+static amber::periph::DigitalOutput warnLight(*WARN_LIGHT_GPIO_Port,
+                                              WARN_LIGHT_Pin);
+
 static amber::periph::DigitalInput vcoMuxOut(*VCO_MUXOUT_GPIO_Port,
                                              VCO_MUXOUT_Pin);
 static amber::periph::AnalogInput lpaPowerDetect(hadc1, ADC_CHANNEL_7);
 
 static bool vcoLocked = false;
 static bool powerOffRequested = false;
+
+static float lpaPower = 0.0f;
 
 auto ADF5355Config() -> amber::adf5355::Driver::InitParam& {
     static amber::adf5355::Driver::InitParam cfg{};
@@ -54,25 +59,29 @@ auto Init() noexcept -> void {
     HAL_Delay(10);
 
     ADF5355().setup();
+
+    warnLight.SetHigh();
 };
 
 auto Update_100hz() noexcept -> void {
     vcoLocked = vcoMuxOut.Read();
+    lpaPower = lpaPowerDetect.ReadVoltage();
 
     if (powerOffRequested) {
         lpaEn.SetLow();
         lnaEn.SetLow();
-        vcoCe.SetLow();
         fan1En.SetLow();
         logampEn.SetHigh();
         vgaEn.SetLow();
+        warnLight.SetLow();
         return;
     } else {
         lpaEn.SetHigh();
         lnaEn.SetHigh();
-        vcoCe.SetHigh();
-        fan1En.SetHigh();
         logampEn.SetLow();
+        fan1En.SetHigh();
+        fan1Pwm.SetHigh();
+        vcoCe.SetHigh();
         vgaEn.SetHigh();
     }
 
@@ -82,6 +91,10 @@ auto Update_100hz() noexcept -> void {
         return;
     }
 };
+
+auto GetLpaPowerDetect() noexcept -> float {
+    return lpaPower;
+}
 
 auto GetVcoLocked() noexcept -> bool {
     return vcoLocked;
