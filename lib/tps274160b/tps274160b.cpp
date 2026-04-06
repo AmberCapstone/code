@@ -40,7 +40,7 @@ auto Driver::diagEnable(bool en) noexcept -> void {
 };
 
 auto Driver::selectDiagPin(uint8_t pin) noexcept -> void {
-    if (pin >= kNumDiagPins) { return; }
+    if (pin >= kNumChannels) { return; }
 
     _cfg.diagSelect[0U].Set(pin & 0x1);
     _cfg.diagSelect[1U].Set((pin >> 1) & 0x1);

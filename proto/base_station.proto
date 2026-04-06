@@ -2,16 +2,44 @@ syntax = "proto3";
 
 package base_station;
 
+enum PowerMuxState {
+    POWER_MUX_STATE_USB_POWER = 0;
+    POWER_MUX_STATE_BARREL_JACK = 1;
+}
+
 message Command {
     uint32 dummy = 1;
 }
 
+message DebugStatus {
+    uint32 tx_counter = 1;
+    uint32 rx_counter = 2;
+    uint32 uart_byte = 3;
+    uint32 uart_receive_count = 4;
+}
+
+message ThermalStatus {
+    float fan_duty_percent = 1;
+}
+
+message HsdCurrents {
+    float channel_1 = 1; // mA
+    float channel_2 = 2; // mA
+    float channel_3 = 3; // mA
+    float channel_4 = 4; // mA
+}
+
+message PowerStatus {
+    PowerMuxState mux_state = 1;
+    bool powered_down = 2;
+    HsdCurrents p6v_hsd1 = 3;
+    HsdCurrents p6v_hsd2 = 4;
+    float p6v_scatter_current = 5; // mA
+    float p12v_current = 6; // mA
+}
+
 message Status {
-    uint32 dummy_echo = 1;
-    // Diagnostics
-    optional uint32 tx_counter = 14;
-    optional uint32 rx_counter = 15;
-    optional float temperature = 16;
-    optional uint32 uart_byte = 17;
-    optional uint32 uart_receive_count = 18;
+    DebugStatus debug = 1;
+    ThermalStatus thermal = 2;
+    PowerStatus power = 3;
 }

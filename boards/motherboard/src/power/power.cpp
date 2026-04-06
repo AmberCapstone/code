@@ -8,6 +8,8 @@
 
 namespace {
 
+constexpr float kMilliampsPerAmp = 1000.0f;
+
 static amber::periph::DigitalInput powerMux(*MUX_ST_GPIO_Port, MUX_ST_Pin);
 
 static uint8_t hsd1CsIdx = 0;
@@ -169,10 +171,10 @@ auto Update_100hz() noexcept -> void {
     P6VHsd1().selectDiagPin(hsd1CsIdx);
     P6VHsd2().selectDiagPin(hsd2CsIdx);
 
-    hsd1Currents[hsd1CsIdx] = P6VHsd1().getCurrent();
-    hsd2Currents[hsd2CsIdx] = P6VHsd2().getCurrent();
-    scatterCurrent = P6VScatter().getCurrent();
-    p12vCurrent = P12VHsd().getCurrent();
+    hsd1Currents[hsd1CsIdx] = P6VHsd1().getCurrent() * kMilliampsPerAmp;
+    hsd2Currents[hsd2CsIdx] = P6VHsd2().getCurrent() * kMilliampsPerAmp;
+    scatterCurrent = P6VScatter().getCurrent() * kMilliampsPerAmp;
+    p12vCurrent = P12VHsd().getCurrent() * kMilliampsPerAmp;
 
     hsd1CsIdx = (hsd1CsIdx + 1) % amber::tps274160b::kNumChannels;
     hsd2CsIdx = (hsd2CsIdx + 1) % amber::tps274160b::kNumChannels;

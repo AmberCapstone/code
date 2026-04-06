@@ -1,6 +1,7 @@
 #include "serial.hpp"
 
 #include "Src/backscatter/backscatter.hpp"
+#include "Src/carrier/carrier.hpp"
 #include "Src/power/power.hpp"
 #include "Src/thermal/thermal.hpp"
 #include "cobs.hpp"
@@ -72,16 +73,38 @@ void Receive(void) {
 
 void SendStatus(void) {
     base_station_status_t status = BASE_STATION_STATUS_INIT_ZERO;
-    status.has_tx_counter = true;
-    status.tx_counter = tx_counter++;
-    status.has_rx_counter = true;
-    status.rx_counter = rx_counter;
-    status.has_temperature = true;
-    status.temperature = thermal::GetCarrierTemp();
-    status.has_uart_byte = true;
-    status.uart_byte = backscatter::GetUartByte();
-    status.has_uart_receive_count = true;
-    status.uart_receive_count = backscatter::GetReceiveCount();
+    const auto& p6v_hsd1_currents = power::GetP6VHsd1Currents();
+    const auto& p6v_hsd2_currents = power::GetP6VHsd2Currents();
+    const bool powered_down = carrier::GetPowerDown();
+
+    status.has_debug = true;
+    status.debug.tx_counter = tx_counter++;
+    status.debug.rx_counter = rx_counter;
+    status.debug.uart_byte = backscatter::GetUartByte();
+    status.debug.uart_receive_count = backscatter::GetReceiveCount();
+
+    status.has_thermal = true;
+    status.thermal.fan_duty_percent = thermal::GetCurrentFanDuty();
+
+    status.has_power = true;
+    status.power.mux_state =
+        static_cast<base_station_power_mux_state_t>(power::GetPowerMuxState());
+    status.power.powered_down = powered_down;
+
+    if (!powered_down) {
+        status.power.has_p6v_hsd1 = true;
+        status.power.p6v_hsd1.channel_1 = p6v_hsd1_currents[0];
+        status.power.p6v_hsd1.channel_2 = p6v_hsd1_currents[1];
+        status.power.p6v_hsd1.channel_3 = p6v_hsd1_currents[2];
+        status.power.p6v_hsd1.channel_4 = p6v_hsd1_currents[3];
+        status.power.has_p6v_hsd2 = true;
+        status.power.p6v_hsd2.channel_1 = p6v_hsd2_currents[0];
+        status.power.p6v_hsd2.channel_2 = p6v_hsd2_currents[1];
+        status.power.p6v_hsd2.channel_3 = p6v_hsd2_currents[2];
+        status.power.p6v_hsd2.channel_4 = p6v_hsd2_currents[3];
+        status.power.p6v_scatter_current = power::GetP6VScatterCurrent();
+        status.power.p12v_current = power::GetP12VCurrent();
+    }
 
     pb_ostream_s ostream =
         pb_ostream_from_buffer(pb_buffer, COUNTOF(pb_buffer));
