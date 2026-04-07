@@ -17,6 +17,8 @@ fn generate_proto() -> Result<()> {
         "sensor/fpga/image.proto",
         "sensor/measure.proto",
         "sensor/nvm.proto",
+        "state.proto",
+        "backscatter.proto",
     ];
 
     // Check for config files

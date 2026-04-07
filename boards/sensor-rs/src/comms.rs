@@ -1,3 +1,4 @@
+use crate::proto::backscatter_;
 use defmt::{error, info};
 use embassy_stm32::{
     gpio::{Flex, Level, Output, Speed},
@@ -6,6 +7,7 @@ use embassy_stm32::{
 };
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, signal::Signal};
 use embassy_time::{Duration, Timer};
+use micropb::{MessageEncode, PbEncoder};
 
 use crate::{
     clock::MCO_CLOCKS,
@@ -13,12 +15,15 @@ use crate::{
     resources::{self, Irqs},
 };
 
-type Msg = [u8; 4];
+type Msg = backscatter_::Status;
+const MAX_SIZE: usize = micropb::size::max_encoded_size::<backscatter_::Status>();
+const COBS_MAX_SIZE: usize = cobs::max_encoding_length(MAX_SIZE) + 1;
 static MESSAGE: Signal<ThreadModeRawMutex, Msg> = Signal::new();
 
 #[embassy_executor::task]
 pub async fn task(mut r: resources::Comms) {
     info!("Starting COMMS task");
+    info!("Backscatter COBS_MAX_SIZE={}", COBS_MAX_SIZE);
     loop {
         let msg = MESSAGE.wait().await;
         backscatter(&mut r, msg).await;
@@ -69,10 +74,18 @@ async fn backscatter(r: &mut resources::Comms, msg: Msg) {
     )
     .unwrap();
 
-    let buffer = msg;
-    info!("delivering backshot {}", buffer);
+    // Encode with protobuf then COBS
+    let mut encoder = PbEncoder::new(heapless::Vec::<u8, MAX_SIZE>::new());
+    msg.encode(&mut encoder).unwrap();
 
-    if let Err(e) = uart.write(&buffer).await {
+    let mut cobs_buf = [0u8; COBS_MAX_SIZE];
+
+    let mut len = cobs::encode(&encoder.into_writer(), &mut cobs_buf);
+    cobs_buf[len] = 0; // buffer must be manually terminated
+    len += 1;
+
+    info!("Backscatter {}", cobs_buf[..len]);
+    if let Err(e) = uart.write(&cobs_buf[..len]).await {
         error!("UART write failed: {}", e);
     }
 

@@ -5,9 +5,12 @@ use amber_connect::{
 use anyhow::{Context, anyhow};
 use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
-use proto::sensor::{
-    self, Action, Command, Status,
-    fpga::{self, CaptureSource, DataRequest},
+use proto::{
+    sensor::{
+        Action, Command, Status,
+        fpga::{self, CaptureSource, DataRequest},
+    },
+    state::State,
 };
 use std::{path::Path, time::Duration};
 use tokio::time::timeout;
@@ -57,23 +60,17 @@ async fn capture(args: Args, control: &mut control::Client, status_socket: &mut 
     let mut cmd = Command::default();
     cmd.set_action(Action::Monitor);
     control.send(cmd).await?;
-    timeout(
-        TIMEOUT,
-        wait_until(status_socket, |s| s.state() != sensor::State::Manual),
-    )
-    .await
-    .context("Timed out trying to reset the sensor")??;
+    timeout(TIMEOUT, wait_until(status_socket, |s| s.state() != State::Manual))
+        .await
+        .context("Timed out trying to reset the sensor")??;
 
     println!("Starting Capture");
     let mut cmd = Command::default();
     cmd.set_action(Action::Manual);
     control.send(cmd).await?;
-    timeout(
-        TIMEOUT,
-        wait_until(status_socket, |s| s.state() == sensor::State::Manual),
-    )
-    .await
-    .context("Timed out trying to enter manual mode")??;
+    timeout(TIMEOUT, wait_until(status_socket, |s| s.state() == State::Manual))
+        .await
+        .context("Timed out trying to enter manual mode")??;
 
     let cmd = Command {
         fpga: Some({

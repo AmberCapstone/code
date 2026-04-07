@@ -82,6 +82,8 @@ void SendStatus(void) {
     status.debug.tx_counter = tx_counter++;
     status.debug.rx_counter = rx_counter;
     status.debug.uart_receive_count = backscatter::GetReceiveCount();
+    status.debug.backscatter_bad_messages = backscatter::GetBackscatterBadMessages();
+    status.debug.comparator_threshold = backscatter::GetDacThreshold();
 
     status.has_thermal = true;
     status.thermal.fan_duty_percent = thermal::GetCurrentFanDuty();
@@ -110,12 +112,9 @@ void SendStatus(void) {
         status.power.p12v_current = power::GetP12VCurrent();
     }
 
-    backscatter_status_t backscatterStatus;
-    backscatter::GetStatus(backscatterStatus);
-    
     status.has_backscatter = true;
-    status.backscatter = backscatterStatus;
-
+    backscatter::GetStatus(status.backscatter);
+    
     pb_ostream_s ostream =
         pb_ostream_from_buffer(pb_buffer, COUNTOF(pb_buffer));
 

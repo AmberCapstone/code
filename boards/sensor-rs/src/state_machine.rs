@@ -5,10 +5,12 @@ use crate::{
     flow::{ChangeSignal, StateLock, poll},
     fpga::{self},
     nvm,
+    proto::backscatter_,
     proto::sensor_::{
-        self, Action, State,
+        self, Action,
         fpga_::{self, DataRequest},
     },
+    proto::state_::State,
     resources::{self, Irqs},
     sensors,
 };
@@ -17,6 +19,8 @@ use defmt::info;
 use embassy_futures::select::select;
 use embassy_stm32::{exti::ExtiInput, gpio::Pull};
 use embassy_time::{Duration, Instant, Timer};
+
+static BACKSCATTER_TX_COUNT: AtomicU32 = AtomicU32::new(0);
 
 const MIN_CAPTURE_VBAT_MV: u32 = 4800;
 const MIN_CAPTURE_PERIOD: Duration = Duration::from_secs(10);
@@ -86,13 +90,20 @@ async fn manual_loop() -> ! {
 }
 
 async fn comms_test() -> ! {
-    let mut x: u8 = 1;
     loop {
         info!("Comms {}", sensors::get_vbat_mv());
         STATE.set(State::Charging);
 
-        comms::send([x, 1, x * 2, 2]);
-        x += 1;
+        let count = BACKSCATTER_TX_COUNT.load(Ordering::Acquire);
+
+        let msg = backscatter_::Status::default()
+            .init_vbat_mv(sensors::get_vbat_mv())
+            .init_isense_ua(sensors::get_isense_ua())
+            .init_state(STATE.get())
+            .init_backscatter_tx_count(count);
+
+        comms::send(msg);
+        BACKSCATTER_TX_COUNT.store(count + 1, Ordering::Relaxed);
 
         Timer::after_millis(1000).await; // avoid captures going too fast
     }
