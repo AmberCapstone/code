@@ -14,6 +14,7 @@ fn main() -> Result<()> {
     let protos = [
         "sensor.proto",
         "sensor/alerts.proto",
+        "sensor/backscatter.proto",
         "sensor/camera.proto",
         "sensor/fpga.proto",
         "sensor/fpga/flash.proto",

@@ -45,7 +45,7 @@ static VBAT_MV: AtomicU32 = AtomicU32::new(3000);
 #[embassy_executor::task]
 pub async fn task(mut r: Sensors) {
     info!("Starting SENSORS task");
-    let mut ticker = Ticker::every(Duration::from_millis(50));
+    let mut ticker = Ticker::every(Duration::from_millis(20));
 
     let mut adc = Adc::new_with_config(
         r.adc,
