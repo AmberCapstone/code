@@ -20,10 +20,8 @@ use embassy_futures::select::select;
 use embassy_stm32::{exti::ExtiInput, gpio::Pull};
 use embassy_time::{Duration, Instant, Timer};
 
-static BACKSCATTER_TX_COUNT: AtomicU32 = AtomicU32::new(0);
-
 const MIN_CAPTURE_VBAT_MV: u32 = 4800;
-const MIN_CAPTURE_PERIOD: Duration = Duration::from_secs(10);
+const MIN_CAPTURE_PERIOD: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Copy, PartialEq)]
 enum NormalState {
@@ -63,9 +61,9 @@ async fn low_power_loop() -> ! {
         fpga::turn_off();
 
         debug_led::send(debug_led::Sequence::LowCharge);
-        // comms::send(());
-        // Send a message over serial
-        Timer::after_millis(1000).await;
+        comms::send(backscatter_::Status::default());
+
+        Timer::after_millis(2000).await;
     }
 }
 
@@ -75,8 +73,7 @@ async fn normal_loop() -> ! {
         fpga::turn_off();
         match NORMAL_STATE.get() {
             NormalState::Manual => select(manual_loop(), NORMAL_STATE.wait()).await,
-            // NormalState::Monitor => select(monitor(), NORMAL_STATE.wait()).await,
-            NormalState::Monitor => select(comms_test(), NORMAL_STATE.wait()).await,
+            NormalState::Monitor => select(monitor(), NORMAL_STATE.wait()).await,
         };
     }
 }
@@ -85,30 +82,10 @@ async fn manual_loop() -> ! {
     STATE.set(State::Manual);
     loop {
         info!("In manual_loop()");
+        comms::send(backscatter_::Status::default());
         Timer::after_millis(2000).await;
     }
 }
-
-async fn comms_test() -> ! {
-    loop {
-        info!("Comms {}", sensors::get_vbat_mv());
-        STATE.set(State::Charging);
-
-        let count = BACKSCATTER_TX_COUNT.load(Ordering::Acquire);
-
-        let msg = backscatter_::Status::default()
-            .init_vbat_mv(sensors::get_vbat_mv())
-            .init_isense_ua(sensors::get_isense_ua())
-            .init_state(STATE.get())
-            .init_backscatter_tx_count(count);
-
-        comms::send(msg);
-        BACKSCATTER_TX_COUNT.store(count + 1, Ordering::Relaxed);
-
-        Timer::after_millis(1000).await; // avoid captures going too fast
-    }
-}
-
 async fn monitor() -> ! {
     LAST_CAPTURE_INTERVAL.store(0, Ordering::Relaxed);
     loop {
@@ -116,12 +93,12 @@ async fn monitor() -> ! {
         STATE.set(State::Charging);
         let start = Instant::now();
 
-        Timer::after_millis(5000).await; // avoid captures going too fast
-
-        while sensors::get_vbat_mv() < MIN_CAPTURE_VBAT_MV {
+        while sensors::get_vbat_mv() < MIN_CAPTURE_VBAT_MV || start.elapsed() < MIN_CAPTURE_PERIOD {
             let measure = sensors::get_status();
             info!("VBAT: {} mV    ISENSE: {} uA", measure.vbat_mv, measure.isense_ua);
-            Timer::after_millis(1000).await;
+            comms::send(backscatter_::Status::default());
+
+            Timer::after_millis(500).await;
         }
 
         STATE.set(State::Capture);
