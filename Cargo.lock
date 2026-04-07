@@ -2196,6 +2196,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "motherboard"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossterm",
+ "futures",
+ "prost",
+ "proto",
+ "ratatui",
+ "serde",
+ "serial",
+ "tokio",
+ "tokio-serial",
+ "tokio-util",
+]
+
+[[package]]
 name = "moxcms"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

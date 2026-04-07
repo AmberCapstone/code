@@ -1,6 +1,6 @@
 /** 
  * @file analog_input.hpp
- * @author Ivan Lange
+ * @author Blake Freer and Ivan Lange
  * @brief Analog input driver wrapper
  * 
  * @date 2026-03-22
@@ -47,8 +47,7 @@ private:
         ADC_ChannelConfTypeDef adcConfig = {
             .Channel = _adcChannel,
             .Rank = ADC_REGULAR_RANK_1,
-            .SamplingTime = ADC_SAMPLETIME_28CYCLES
-            .Offset = 0
+            .SamplingTime = ADC_SAMPLETIME_19CYCLES_5,
         };
 
         HAL_ADC_ConfigChannel(&_hadc, &adcConfig);

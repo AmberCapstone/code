@@ -27,16 +27,16 @@ void setup() {
   cs_tx.setHigh();
   cs_rx.setHigh();
 
-  cc1101::Driver transmitter(SPI, miso, cs_tx);
-  cc1101::Driver receiver(SPI, miso, cs_rx);
+  amber::cc1101::Driver transmitter(SPI, miso, cs_tx);
+  amber::cc1101::Driver receiver(SPI, miso, cs_rx);
 
   transmitter.reset();
-  transmitter.configure(cc1101::Driver::Frequency::MHZ_915);
-  transmitter.begin(cc1101::Driver::Direction::TX);
+  transmitter.configure(amber::cc1101::Driver::Frequency::MHZ_915);
+  transmitter.begin(amber::cc1101::Driver::Direction::TX);
 
   receiver.reset();
-  receiver.configure(cc1101::Driver::Frequency::MHZ_915);
-  receiver.begin(cc1101::Driver::Direction::TX);
+  receiver.configure(amber::cc1101::Driver::Frequency::MHZ_915);
+  receiver.begin(amber::cc1101::Driver::Direction::TX);
 }
 
 void loop() {

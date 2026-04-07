@@ -3,7 +3,7 @@
 #include <SPI.h>
 #include "digital.hpp"
 
-namespace cc1101 {
+namespace amber::cc1101 {
 
 namespace {
 
@@ -61,4 +61,4 @@ private:
     pin::DigitalOutput& _cs;
 };
 
-} // namespace cc1101
+} // namespace amber::cc1101

@@ -1,6 +1,6 @@
 /** 
  * @file digital.hpp
- * @author Ivan Lange
+ * @author Blake Freer and Ivan Lange
  * @brief Digital input/output driver wrapper
  * 
  * @date 2026-03-22
@@ -47,6 +47,9 @@ struct DigitalOutput {
     }
     auto SetLow() noexcept -> void {
         HAL_GPIO_WritePin(&_port, _pin, GPIO_PIN_RESET);
+    }
+    auto Set(bool value) noexcept -> void {
+        HAL_GPIO_WritePin(&_port, _pin, value ? GPIO_PIN_SET : GPIO_PIN_RESET);
     }
     auto Toggle() noexcept -> void {
         HAL_GPIO_TogglePin(&_port, _pin);

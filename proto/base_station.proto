@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package base_station;
+
+enum PowerMuxState {
+    POWER_MUX_STATE_USB_POWER = 0;
+    POWER_MUX_STATE_BARREL_JACK = 1;
+}
+
+message Command {
+    uint32 dummy = 1;
+}
+
+message DebugStatus {
+    uint32 tx_counter = 1;
+    uint32 rx_counter = 2;
+    uint32 x_coord = 3;
+    uint32 y_coord = 4;
+    uint32 uart_receive_count = 5;
+    float comparator_threshold = 6;
+}
+
+message ThermalStatus {
+    float fan_duty_percent = 1;
+}
+
+message CarrierStatus {
+    bool vco_locked = 1;
+    float lpa_power_detect = 2; // V
+}
+
+message HsdCurrents {
+    float channel_1 = 1; // mA
+    float channel_2 = 2; // mA
+    float channel_3 = 3; // mA
+    float channel_4 = 4; // mA
+}
+
+message PowerStatus {
+    PowerMuxState mux_state = 1;
+    bool powered_down = 2;
+    HsdCurrents p6v_hsd1 = 3;
+    HsdCurrents p6v_hsd2 = 4;
+    float p6v_scatter_current = 5; // mA
+    float p12v_current = 6; // mA
+}
+
+message Status {
+    DebugStatus debug = 1;
+    ThermalStatus thermal = 2;
+    PowerStatus power = 3;
+    CarrierStatus carrier = 4;
+}

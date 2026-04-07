@@ -1,6 +1,6 @@
 #include "cc1101.hpp"
 
-namespace cc1101 {
+namespace amber::cc1101 {
 
 Driver::Driver(
     const SPIClass& spi,
@@ -102,4 +102,4 @@ auto Driver::begin(const Direction dir) noexcept -> void {
     delay(10);
 };
 
-} // namespace cc1101
+} // namespace amber::cc1101
