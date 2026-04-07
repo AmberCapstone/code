@@ -8,12 +8,15 @@ use clap::{Parser, ValueEnum};
 use file::FlashFile;
 use flash_layout::PAGE_SIZE;
 use indicatif::{ProgressBar, ProgressStyle};
-use proto::sensor::{
-    self, Action, Command, Status,
-    fpga::{
-        self,
-        flash::{self, Segment},
+use proto::{
+    sensor::{
+        Action, Command, Status,
+        fpga::{
+            self,
+            flash::{self, Segment},
+        },
     },
+    state::State,
 };
 use std::{
     path::PathBuf,
@@ -72,13 +75,7 @@ async fn flash(file: FlashFile, control: &mut control::Client, status_socket: &m
     cmd.set_action(Action::Monitor);
     timeout(
         Duration::from_secs(1),
-        command_until(
-            cmd,
-            |s| s.state() != sensor::State::Manual,
-            control,
-            status_socket,
-            TIMEOUT,
-        ),
+        command_until(cmd, |s| s.state() != State::Manual, control, status_socket, TIMEOUT),
     )
     .await
     .context("Timed out trying to reset the sensor")??;
@@ -88,13 +85,7 @@ async fn flash(file: FlashFile, control: &mut control::Client, status_socket: &m
     cmd.set_action(Action::Manual);
     timeout(
         TIMEOUT,
-        command_until(
-            cmd,
-            |s| s.state() == sensor::State::Manual,
-            control,
-            status_socket,
-            TIMEOUT,
-        ),
+        command_until(cmd, |s| s.state() == State::Manual, control, status_socket, TIMEOUT),
     )
     .await
     .context("Timed out trying to enter manual mode")??;
@@ -237,14 +228,7 @@ async fn flash(file: FlashFile, control: &mut control::Client, status_socket: &m
     println!("Exiting manual mode");
     let mut cmd = Command::default();
     cmd.set_action(Action::Monitor);
-    command_until(
-        cmd,
-        |s| s.state() != sensor::State::Manual,
-        control,
-        status_socket,
-        TIMEOUT,
-    )
-    .await?;
+    command_until(cmd, |s| s.state() != State::Manual, control, status_socket, TIMEOUT).await?;
 
     if errors.is_empty() {
         Ok(())

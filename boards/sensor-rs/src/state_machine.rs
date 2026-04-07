@@ -6,9 +6,10 @@ use crate::{
     fpga::{self},
     nvm,
     proto::sensor_::{
-        self, Action, State,
+        self, Action,
         fpga_::{self, DataRequest},
     },
+    proto::state_::State,
     resources::{self, Irqs},
     sensors,
 };

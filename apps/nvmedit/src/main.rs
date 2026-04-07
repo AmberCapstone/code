@@ -4,9 +4,12 @@ use amber_connect::{
 };
 use anyhow::{Context, anyhow};
 use clap::{Parser, Subcommand};
-use proto::sensor::{
-    self,
-    nvm::{self, Parameters},
+use proto::{
+    sensor::{
+        self,
+        nvm::{self, Parameters},
+    },
+    state::State,
 };
 use std::{
     io::{Read, Write},
@@ -68,14 +71,14 @@ async fn run_operation(control: &mut control::Client, status: &mut SubSocket, ar
     let mut cmd = sensor::Command::default();
     cmd.set_action(sensor::Action::Monitor);
     control.send(cmd).await?;
-    timeout(TIMEOUT, wait_until(status, |s| s.state() != sensor::State::Manual))
+    timeout(TIMEOUT, wait_until(status, |s| s.state() != State::Manual))
         .await
         .context("Timed out trying to reset the sensor")??;
 
     let mut cmd = sensor::Command::default();
     cmd.set_action(sensor::Action::Manual);
     control.send(cmd).await?;
-    timeout(TIMEOUT, wait_until(status, |s| s.state() == sensor::State::Manual))
+    timeout(TIMEOUT, wait_until(status, |s| s.state() == State::Manual))
         .await
         .context("Timed out trying to enter manual mode")??;
 
@@ -106,7 +109,7 @@ async fn run_operation(control: &mut control::Client, status: &mut SubSocket, ar
     let mut cmd = sensor::Command::default();
     cmd.set_action(sensor::Action::Monitor);
     control.send(cmd).await?;
-    timeout(TIMEOUT, wait_until(status, |s| s.state() != sensor::State::Manual))
+    timeout(TIMEOUT, wait_until(status, |s| s.state() != State::Manual))
         .await
         .context("Timed out trying to reset the sensor")??;
 
