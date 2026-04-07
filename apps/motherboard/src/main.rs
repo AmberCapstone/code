@@ -185,6 +185,7 @@ async fn tui(mut status_rx: Receiver<Status>, stop: CancellationToken) -> anyhow
         }
 
         terminal.draw(|f| {
+            let last_status = last_status.clone();
             let alt_style = Style::default().fg(Color::LightGreen);
 
             let [title_area, body_area, footer_area] =
