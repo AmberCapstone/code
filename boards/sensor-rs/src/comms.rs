@@ -1,4 +1,4 @@
-use crate::proto::sensor_::backscatter_;
+use crate::proto::backscatter_;
 use defmt::{error, info};
 use embassy_stm32::{
     gpio::{Flex, Level, Output, Speed},
@@ -84,6 +84,7 @@ async fn backscatter(r: &mut resources::Comms, msg: Msg) {
     cobs_buf[len] = 0; // buffer must be manually terminated
     len += 1;
 
+    info!("Backscatter {}", cobs_buf[..len]);
     if let Err(e) = uart.write(&cobs_buf[..len]).await {
         error!("UART write failed: {}", e);
     }

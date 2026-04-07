@@ -18,6 +18,7 @@ fn generate_proto() -> Result<()> {
         "sensor/measure.proto",
         "sensor/nvm.proto",
         "state.proto",
+        "backscatter.proto",
     ];
 
     // Check for config files

@@ -5,8 +5,9 @@ use crate::{
     flow::{ChangeSignal, StateLock, poll},
     fpga::{self},
     nvm,
+    proto::backscatter_,
     proto::sensor_::{
-        self, Action, backscatter_,
+        self, Action,
         fpga_::{self, DataRequest},
     },
     proto::state_::State,
@@ -98,6 +99,7 @@ async fn comms_test() -> ! {
         let msg = backscatter_::Status::default()
             .init_vbat_mv(sensors::get_vbat_mv())
             .init_isense_ua(sensors::get_isense_ua())
+            .init_state(STATE.get())
             .init_backscatter_tx_count(count);
 
         comms::send(msg);
