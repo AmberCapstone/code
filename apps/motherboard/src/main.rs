@@ -9,7 +9,11 @@ use crossterm::{
     execute,
 };
 use futures::{FutureExt, TryFutureExt};
-use proto::base_station::{Command, Status};
+use proto::{
+    backscatter,
+    base_station::{Command, Status},
+    state::State,
+};
 use ratatui::{
     layout::{Constraint, Layout},
     style::{Color, Style},
@@ -19,6 +23,7 @@ use tokio::{
     select,
     sync::mpsc::{self, Receiver},
     task::JoinSet,
+    time::interval,
 };
 use tokio_serial::UsbPortInfo;
 use tokio_util::sync::CancellationToken;
@@ -36,6 +41,11 @@ async fn main() -> anyhow::Result<()> {
 
     let mut services = JoinSet::<anyhow::Result<()>>::new();
     services.spawn(fan(status_rx, vec![backscatter_tx, printer_tx], stop.clone()));
+
+    #[cfg(feature = "mock")]
+    services.spawn(mock_serial(status_tx, stop.clone()));
+
+    #[cfg(not(feature = "mock"))]
     services.spawn(serial::run(command_rx, status_tx, is_base_station, stop.clone()).map(Ok));
     services.spawn(backscatter_server::run(backscatter_rx, stop.clone()).map_err(anyhow::Error::from));
     services.spawn(tui(printer_rx, stop.clone()));
@@ -48,6 +58,57 @@ async fn main() -> anyhow::Result<()> {
     services.join_all().await;
 
     Ok(())
+}
+
+async fn mock_serial(status_tx: mpsc::Sender<Status>, stop: CancellationToken) -> anyhow::Result<()> {
+    stop.run_until_cancelled(async {
+        let mut x: u8 = 0;
+        let mut y: u8 = 0;
+        let mut count: u32 = 0;
+
+        let mut interval = interval(Duration::from_millis(200));
+
+        loop {
+            let mut bs = backscatter::Status {
+                vbat_mv: 4800,
+                isense_ua: 5500,
+                ..Default::default()
+            };
+            bs.set_state(State::Charging);
+
+            for _ in 0..4 {
+                bs.backscatter_tx_count = count;
+                count += 1;
+
+                status_tx
+                    .send(Status {
+                        backscatter: Some(bs),
+                        ..Default::default()
+                    })
+                    .await?;
+                interval.tick().await;
+            }
+
+            bs.backscatter_tx_count = count;
+            count += 1;
+            bs.set_state(State::Capture);
+            bs.x = Some(x.into());
+            bs.y = Some(y.into());
+
+            x += 2;
+            y = (y + 1) % 240;
+
+            status_tx
+                .send(Status {
+                    backscatter: Some(bs),
+                    ..Default::default()
+                })
+                .await?;
+            interval.tick().await;
+        }
+    })
+    .await
+    .unwrap_or(Ok(()))
 }
 
 async fn fan<T: Clone>(
