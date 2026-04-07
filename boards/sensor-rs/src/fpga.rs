@@ -13,11 +13,15 @@ use embassy_time::{Duration, Timer};
 use heapless::Vec;
 
 use crate::{
-    camera,
+    camera, comms,
     flow::{StateLock, poll},
     power::PowerSignal,
-    proto::sensor_::fpga_::{Action, CaptureSource, Centroid, Command, DataRequest, State, Status, Vessels, image_},
+    proto::{
+        backscatter_,
+        sensor_::fpga_::{Action, CaptureSource, Centroid, Command, DataRequest, State, Status, Vessels, image_},
+    },
     resources::{Fpga, FpgaPower, Irqs},
+    sensors, state_machine,
 };
 
 pub mod flash;
@@ -195,18 +199,18 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource, data_request: DataReq
             let _ = SPI_RX_TO_SEND.try_send(buffer.into());
             cs_n.set_high();
 
-            // Unpack the bytes to a Vessels struct
-            let v = Vessels {
-                count: u32::from(buffer[0]), // should be 1
-                centroids: [Centroid {
-                    x: u32::from(u16::from_le_bytes(buffer[1..3].try_into().unwrap())),
-                    y: u32::from(u16::from_le_bytes(buffer[3..5].try_into().unwrap())),
-                }]
-                .into(),
-            };
+            let x = u32::from(u16::from_le_bytes(buffer[1..3].try_into().unwrap()));
+            let y = u32::from(u16::from_le_bytes(buffer[3..5].try_into().unwrap()));
+            info!("Boat at (x,y) = ({}, {})", x, y);
+
+            let backscatter_msg = backscatter_::Status::default().init_x(x).init_y(y);
+            comms::send(backscatter_msg);
 
             #[cfg(feature = "usb")]
-            VESSELS_TO_SEND.signal(v);
+            VESSELS_TO_SEND.signal(Vessels {
+                count: u32::from(buffer[0]), // should be 1
+                centroids: [Centroid { x, y }].into(),
+            });
             Timer::after_millis(100).await; // hacky way to hold data ready
         }
         _ => (),

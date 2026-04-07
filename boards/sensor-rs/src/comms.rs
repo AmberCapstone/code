@@ -1,4 +1,6 @@
-use crate::proto::backscatter_;
+use core::sync::atomic::{AtomicU32, Ordering};
+
+use crate::{proto::backscatter_, sensors, state_machine};
 use defmt::{error, info};
 use embassy_stm32::{
     gpio::{Flex, Level, Output, Speed},
@@ -20,6 +22,8 @@ const MAX_SIZE: usize = micropb::size::max_encoded_size::<backscatter_::Status>(
 const COBS_MAX_SIZE: usize = cobs::max_encoding_length(MAX_SIZE) + 1;
 static MESSAGE: Signal<ThreadModeRawMutex, Msg> = Signal::new();
 
+static BACKSCATTER_TX_COUNT: AtomicU32 = AtomicU32::new(0);
+
 #[embassy_executor::task]
 pub async fn task(mut r: resources::Comms) {
     info!("Starting COMMS task");
@@ -34,7 +38,7 @@ pub fn send(msg: Msg) {
     MESSAGE.signal(msg);
 }
 
-async fn backscatter(r: &mut resources::Comms, msg: Msg) {
+async fn backscatter(r: &mut resources::Comms, mut msg: Msg) {
     let _mco = Mco::new(r.mco.reborrow(), r.carrier.reborrow(), MCO_CLOCKS.source, {
         let mut config = McoConfig::default();
         config.prescaler = MCO_CLOCKS.carrier_div;
@@ -44,16 +48,14 @@ async fn backscatter(r: &mut resources::Comms, msg: Msg) {
 
     debug_led::send(debug_led::Sequence::Backscattering);
 
-    Timer::after_millis(10).await;
+    let count = BACKSCATTER_TX_COUNT.load(Ordering::Acquire);
+    msg.set_backscatter_tx_count(count);
+    BACKSCATTER_TX_COUNT.store(count + 1, Ordering::Relaxed);
+    msg.set_vbat_mv(sensors::get_vbat_mv());
+    msg.set_isense_ua(sensors::get_isense_ua());
+    msg.set_state(state_machine::get_state());
 
-    // let mut gate = Output::new(r.tx.reborrow(), Level::Low, Speed::Low);
-    //
-    // gate.set_high();
-    // Timer::after_millis(100).await;
-    //
-    // gate.set_low();
-    // Timer::after_millis(100).await;
-    // drop(gate);
+    Timer::after_millis(10).await;
 
     let mut uart = Uart::new(
         r.uart.reborrow(),
