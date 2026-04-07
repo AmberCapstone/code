@@ -38,6 +38,7 @@ auto task_1000hz(void* argument) -> void {
 
     while (true) {
         serial::Receive();
+        backscatter::Receive();
         backscatter::Update1000hz();
         vTaskDelayUntil(&wake_time, pdMS_TO_TICKS(1));
     }
