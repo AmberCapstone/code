@@ -6,17 +6,19 @@ edition = "2024"
 [dependencies]
 amber-connect = { version = "0.1.0", path = "../../lib/rust/amber-connect" }
 anyhow = "1.0.102"
+axum = { version = "0.8.8", features = ["ws"] }
 crossterm = "0.29.0"
 futures = "0.3.32"
 prost = "0.14.3"
 proto = { version = "0.1.0", path = "../../lib/rust/proto" }
 ratatui = "0.30.0"
 serde = "1.0.228"
+serde_json = "1.0.149"
 serial = { version = "0.1.0", path = "../../lib/rust/serial" }
 tokio = { version = "1.50.0", features = ["rt", "time"] }
 tokio-serial = "5.4.5"
 tokio-util = "0.7.18"
-zeromq = "0.5.0"
+tower-http = "0.6.8"
 
 [lints]
 workspace = true

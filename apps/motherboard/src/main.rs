@@ -62,11 +62,9 @@ async fn main() -> anyhow::Result<()> {
 
 async fn mock_serial(status_tx: mpsc::Sender<Status>, stop: CancellationToken) -> anyhow::Result<()> {
     stop.run_until_cancelled(async {
-        let mut x: u8 = 0;
-        let mut y: u8 = 0;
         let mut count: u32 = 0;
 
-        let mut interval = interval(Duration::from_millis(200));
+        let mut interval = interval(Duration::from_millis(1000));
 
         loop {
             let mut bs = backscatter::Status {
@@ -89,22 +87,21 @@ async fn mock_serial(status_tx: mpsc::Sender<Status>, stop: CancellationToken) -
                 interval.tick().await;
             }
 
-            bs.backscatter_tx_count = count;
-            count += 1;
-            bs.set_state(State::Capture);
-            bs.x = Some(x.into());
-            bs.y = Some(y.into());
+            for (x, y) in [(0u32, 0u32), (320, 0), (320, 240), (0, 240)] {
+                bs.backscatter_tx_count = count;
+                count += 1;
+                bs.set_state(State::Capture);
+                bs.x = Some(x);
+                bs.y = Some(y);
 
-            x += 2;
-            y = (y + 1) % 240;
-
-            status_tx
-                .send(Status {
-                    backscatter: Some(bs),
-                    ..Default::default()
-                })
-                .await?;
-            interval.tick().await;
+                status_tx
+                    .send(Status {
+                        backscatter: Some(bs),
+                        ..Default::default()
+                    })
+                    .await?;
+                interval.tick().await;
+            }
         }
     })
     .await
@@ -200,7 +197,8 @@ async fn tui(mut status_rx: Receiver<Status>, stop: CancellationToken) -> anyhow
             })
             .style(alt_style);
 
-            let para = Paragraph::new(last_status.map(|s| format!("{s:#?}")).unwrap_or_default())
+            let para_text = last_status.map(|s| format!("{s:#?}")).unwrap_or_default();
+            let para = Paragraph::new(para_text)
                 .scroll((scroll, 0))
                 .block(Block::default().borders(Borders::all()));
 
