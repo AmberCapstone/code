@@ -190,38 +190,18 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource, data_request: DataReq
             let _ = SPI_TX_TO_SEND.try_send(to_tx.into());
             let _res = spi.write(&to_tx).await;
 
-            let mut discard = [0u8];
-            let _res = spi.read(&mut discard).await;
-            let mut buffer = [0u8; 21];
+            let mut buffer = [0u8; 5];
             let _res = spi.read(&mut buffer).await;
             let _ = SPI_RX_TO_SEND.try_send(buffer.into());
             cs_n.set_high();
 
             // Unpack the bytes to a Vessels struct
             let v = Vessels {
-                count: u32::from(buffer[0]),
-                centroids: [
-                    Centroid {
-                        x: u32::from(u16::from_le_bytes(buffer[1..3].try_into().unwrap())),
-                        y: u32::from(u16::from_le_bytes(buffer[3..5].try_into().unwrap())),
-                    },
-                    Centroid {
-                        x: u32::from(u16::from_le_bytes(buffer[5..7].try_into().unwrap())),
-                        y: u32::from(u16::from_le_bytes(buffer[7..9].try_into().unwrap())),
-                    },
-                    Centroid {
-                        x: u32::from(u16::from_le_bytes(buffer[9..11].try_into().unwrap())),
-                        y: u32::from(u16::from_le_bytes(buffer[11..13].try_into().unwrap())),
-                    },
-                    Centroid {
-                        x: u32::from(u16::from_le_bytes(buffer[13..15].try_into().unwrap())),
-                        y: u32::from(u16::from_le_bytes(buffer[15..17].try_into().unwrap())),
-                    },
-                    Centroid {
-                        x: u32::from(u16::from_le_bytes(buffer[17..19].try_into().unwrap())),
-                        y: u32::from(u16::from_le_bytes(buffer[19..21].try_into().unwrap())),
-                    },
-                ]
+                count: u32::from(buffer[0]), // should be 1
+                centroids: [Centroid {
+                    x: u32::from(u16::from_le_bytes(buffer[1..3].try_into().unwrap())),
+                    y: u32::from(u16::from_le_bytes(buffer[3..5].try_into().unwrap())),
+                }]
                 .into(),
             };
 

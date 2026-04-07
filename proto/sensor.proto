@@ -6,14 +6,7 @@ import "sensor/camera.proto";
 import "sensor/fpga.proto";
 import "sensor/measure.proto";
 import "sensor/nvm.proto";
-
-enum State {
-    STATE_UNKNOWN = 0;
-    STATE_MANUAL = 1;
-    STATE_CHARGING = 2;
-    STATE_CAPTURE = 3;
-    STATE_LOW_CHARGE = 4;
-}
+import "sensor/state.proto";
 
 enum Action {
     ACTION_NONE = 0;

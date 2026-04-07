@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package sensor;
+
+enum State {
+    STATE_UNKNOWN = 0;
+    STATE_MANUAL = 1;
+    STATE_CHARGING = 2;
+    STATE_CAPTURE = 3;
+    STATE_LOW_CHARGE = 4;
+}
