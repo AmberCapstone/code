@@ -56,9 +56,12 @@ void MX_ADC1_Init(void) {
     hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
     hadc1.Init.DMAContinuousRequests = DISABLE;
     hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
-    hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_1CYCLE_5;
-    hadc1.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_1CYCLE_5;
-    hadc1.Init.OversamplingMode = DISABLE;
+    hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_160CYCLES_5;
+    hadc1.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_160CYCLES_5;
+    hadc1.Init.OversamplingMode = ENABLE;
+    hadc1.Init.Oversampling.Ratio = ADC_OVERSAMPLING_RATIO_16;
+    hadc1.Init.Oversampling.RightBitShift = ADC_RIGHTBITSHIFT_4;
+    hadc1.Init.Oversampling.TriggeredMode = ADC_TRIGGEREDMODE_SINGLE_TRIGGER;
     hadc1.Init.TriggerFrequencyMode = ADC_TRIGGER_FREQ_HIGH;
     if (HAL_ADC_Init(&hadc1) != HAL_OK) {
         Error_Handler();
@@ -66,7 +69,7 @@ void MX_ADC1_Init(void) {
 
     /** Configure Regular Channel
      */
-    sConfig.Channel = ADC_CHANNEL_0;
+    sConfig.Channel = ADC_CHANNEL_4;
     sConfig.Rank = ADC_REGULAR_RANK_1;
     sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
@@ -89,15 +92,13 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle) {
         __HAL_RCC_GPIOA_CLK_ENABLE();
         __HAL_RCC_GPIOB_CLK_ENABLE();
         /**ADC1 GPIO Configuration
-        PA0     ------> ADC1_IN0
         PA4     ------> ADC1_IN4
         PA7     ------> ADC1_IN7
         PB1     ------> ADC1_IN9
         PB2     ------> ADC1_IN10
         PB10     ------> ADC1_IN11
         */
-        GPIO_InitStruct.Pin =
-            LOG_VSENSE_Pin | P6V_SCATTER_CS_Pin | LPA_PWR_DET_Pin;
+        GPIO_InitStruct.Pin = P6V_SCATTER_CS_Pin | LPA_PWR_DET_Pin;
         GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
         GPIO_InitStruct.Pull = GPIO_NOPULL;
         HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -122,15 +123,13 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle) {
         __HAL_RCC_ADC_CLK_DISABLE();
 
         /**ADC1 GPIO Configuration
-        PA0     ------> ADC1_IN0
         PA4     ------> ADC1_IN4
         PA7     ------> ADC1_IN7
         PB1     ------> ADC1_IN9
         PB2     ------> ADC1_IN10
         PB10     ------> ADC1_IN11
         */
-        HAL_GPIO_DeInit(GPIOA,
-                        LOG_VSENSE_Pin | P6V_SCATTER_CS_Pin | LPA_PWR_DET_Pin);
+        HAL_GPIO_DeInit(GPIOA, P6V_SCATTER_CS_Pin | LPA_PWR_DET_Pin);
 
         HAL_GPIO_DeInit(GPIOB, P6V_CS_TWO_Pin | P6V_CS_ONE_Pin | P12V_CS_Pin);
 

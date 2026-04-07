@@ -52,7 +52,7 @@
 
 /* USER CODE BEGIN PV */
 int pwr_down_flag = 0;
-uint8_t uartByte = 1;
+uint8_t uartBuffer[4];
 uint8_t uartReceiveCount = 0;
 /* USER CODE END PV */
 

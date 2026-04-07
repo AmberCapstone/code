@@ -71,8 +71,6 @@ void Error_Handler(void);
 #define LNA_EN_GPIO_Port GPIOC
 #define LOGAMP_EN_Pin GPIO_PIN_2
 #define LOGAMP_EN_GPIO_Port GPIOC
-#define LOG_VSENSE_Pin GPIO_PIN_0
-#define LOG_VSENSE_GPIO_Port GPIOA
 #define P6V_SCATTER_CS_Pin GPIO_PIN_4
 #define P6V_SCATTER_CS_GPIO_Port GPIOA
 #define DAC_ADJ_Pin GPIO_PIN_5
@@ -161,7 +159,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 extern int pwr_down_flag;
-extern uint8_t uartByte;
+extern uint8_t uartBuffer[4];
 extern uint8_t uartReceiveCount;
 /* USER CODE END Private defines */
 

@@ -76,11 +76,14 @@ void SendStatus(void) {
     const auto& p6v_hsd1_currents = power::GetP6VHsd1Currents();
     const auto& p6v_hsd2_currents = power::GetP6VHsd2Currents();
     const bool powered_down = carrier::GetPowerDown();
+    const auto xCoord = backscatter::GetXCoord();
+    const auto yCoord = backscatter::GetYCoord();
 
     status.has_debug = true;
     status.debug.tx_counter = tx_counter++;
     status.debug.rx_counter = rx_counter;
-    status.debug.uart_byte = backscatter::GetUartByte();
+    status.debug.x_coord = xCoord;
+    status.debug.y_coord = yCoord;
     status.debug.uart_receive_count = backscatter::GetReceiveCount();
 
     status.has_thermal = true;
