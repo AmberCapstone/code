@@ -110,6 +110,10 @@ pub fn get_vbat_mv() -> u32 {
     VBAT_MV.load(Ordering::Acquire)
 }
 
+pub fn get_isense_ua() -> u32 {
+    ISENSE_UA.load(Ordering::Acquire)
+}
+
 pub fn get_status() -> proto::sensor_::Measurement {
     proto::sensor_::Measurement {
         temperature_degc: TEMPERATURE_DEGC.load(Ordering::Acquire),
