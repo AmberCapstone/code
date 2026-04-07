@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+amber-connect = { version = "0.1.0", path = "../../lib/rust/amber-connect" }
 anyhow = "1.0.102"
 crossterm = "0.29.0"
 futures = "0.3.32"
@@ -15,6 +16,7 @@ serial = { version = "0.1.0", path = "../../lib/rust/serial" }
 tokio = { version = "1.50.0", features = ["rt", "time"] }
 tokio-serial = "5.4.5"
 tokio-util = "0.7.18"
+zeromq = "0.5.0"
 
 [lints]
 workspace = true

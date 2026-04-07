@@ -2061,6 +2061,7 @@ dependencies = [
 name = "motherboard"
 version = "0.1.0"
 dependencies = [
+ "amber-connect",
  "anyhow",
  "crossterm",
  "futures",
@@ -2072,6 +2073,7 @@ dependencies = [
  "tokio",
  "tokio-serial",
  "tokio-util",
+ "zeromq",
 ]
 
 [[package]]
