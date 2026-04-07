@@ -2,12 +2,14 @@
 
 #include <cstdint>
 
+#include "backscatter.pb.h"
+
 namespace backscatter {
 
 auto Init() noexcept -> void;
 auto Update1000hz() noexcept -> void;
+auto Receive() noexcept -> void;
 auto GetReceiveCount() noexcept -> uint8_t;
-auto GetXCoord() noexcept -> uint16_t;
-auto GetYCoord() noexcept -> uint16_t;
+auto GetStatus(backscatter_status_t&) noexcept -> void;
 
 }  // namespace backscatter

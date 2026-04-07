@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package sensor;
+package sensor.state;
 
 enum State {
     STATE_UNKNOWN = 0;
