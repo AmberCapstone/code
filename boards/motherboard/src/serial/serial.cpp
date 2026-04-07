@@ -3,7 +3,6 @@
 #include "Src/backscatter/backscatter.hpp"
 #include "Src/carrier/carrier.hpp"
 #include "Src/power/power.hpp"
-#include "Src/backscatter/backscatter.hpp"
 #include "Src/thermal/thermal.hpp"
 #include "cobs.hpp"
 #include "common_macros.hpp"
@@ -82,7 +81,8 @@ void SendStatus(void) {
     status.debug.tx_counter = tx_counter++;
     status.debug.rx_counter = rx_counter;
     status.debug.uart_receive_count = backscatter::GetReceiveCount();
-    status.debug.backscatter_bad_messages = backscatter::GetBackscatterBadMessages();
+    status.debug.backscatter_bad_messages =
+        backscatter::GetBackscatterBadMessages();
     status.debug.comparator_threshold = backscatter::GetDacThreshold();
 
     status.has_thermal = true;
@@ -114,7 +114,7 @@ void SendStatus(void) {
 
     status.has_backscatter = true;
     backscatter::GetStatus(status.backscatter);
-    
+
     pb_ostream_s ostream =
         pb_ostream_from_buffer(pb_buffer, COUNTOF(pb_buffer));
 
