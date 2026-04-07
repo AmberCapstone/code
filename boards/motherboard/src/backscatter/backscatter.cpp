@@ -1,9 +1,9 @@
 #include "backscatter.hpp"
 
+#include "cobs.hpp"
 #include "periph/analog_input.hpp"
 #include "periph/analog_output.hpp"
 #include "periph/digital.hpp"
-#include "cobs.hpp"
 
 // Proto
 #include "pb_decode.h"
