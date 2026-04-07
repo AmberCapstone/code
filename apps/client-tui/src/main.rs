@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use amber_connect::{self, codec::PbReceiver};
 use crossterm::{
-    event::{self, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind,
+    },
     execute,
 };
 use proto::sensor::Status;
@@ -91,8 +93,10 @@ async fn tui(mut status_rx: watch::Receiver<Option<Status>>, stop: CancellationT
     }
 
     stop.cancel();
+    let r = execute!(terminal.backend_mut(), DisableMouseCapture);
     ratatui::restore();
-    Ok(())
+
+    r.map_err(anyhow::Error::from)
 }
 
 async fn reader(tx: watch::Sender<Option<Status>>, stop: CancellationToken) -> anyhow::Result<()> {
