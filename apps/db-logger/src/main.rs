@@ -49,6 +49,7 @@ async fn main() -> anyhow::Result<()> {
                 .rule("measurement.*Ua", LogPolicy::EveryMeasurement)
                 .rule("*state*", LogPolicy::on_change(Duration::from_millis(500)))
                 .rule("name", LogPolicy::on_change(Duration::from_secs(60)))
+                .rule("lastCaptureIntervalMs", LogPolicy::on_change(Duration::from_secs(2)))
                 .rule("sensor.nvm.parameters", LogPolicy::EveryMeasurement), // only present during NVM actions
         );
 

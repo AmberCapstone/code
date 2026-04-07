@@ -3,3 +3,6 @@ max_bytes = 64
 
 ["Status.spi_rx"]
 max_bytes = 64
+
+["Vessels.centroids"]
+max_len = 5

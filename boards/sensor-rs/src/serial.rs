@@ -28,6 +28,7 @@ static STATE: Mutex<ThreadModeRawMutex, State> = Mutex::new(State {
 
 #[embassy_executor::task]
 pub async fn task(u: resources::Usb) {
+    info!("Starting SERIAL task");
     // Config largely copied from embassy/examples/stm32u/src/bin/usb_serial.rs
     let driver = Driver::new(u.usb, resources::Irqs, u.dp, u.dm);
 
@@ -46,7 +47,7 @@ pub async fn task(u: resources::Usb) {
         config,
         &mut config_descriptor,
         &mut bos_descriptor,
-        &mut [], // No msos descriptors
+        &mut [],
         &mut control_buf,
     );
 
@@ -73,6 +74,7 @@ pub async fn task(u: resources::Usb) {
     };
 
     join3(usb_fut, send_fut, recv_fut).await; // never returns
+    info!("SERIAL task ended");
 }
 
 async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>) -> Result<(), Disconnected> {
@@ -85,7 +87,7 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
 
     loop {
         let state = STATE.lock().await.clone();
-        let status = proto::sensor_::Status::default()
+        let mut status = proto::sensor_::Status::default()
             .init_name(nvm::get_name())
             .init_rx_counter(state.rx_counter)
             .init_tx_counter(state.tx_counter)
@@ -95,6 +97,13 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
             .init_alerts(0u64) // TODO: actual alerts
             .init_fpga(fpga::get_status())
             .init_camera(camera::get_status());
+
+        let last_capture_ms = state_machine::get_last_charge_ms();
+        if last_capture_ms > 0 {
+            status.set_last_capture_interval_ms(last_capture_ms);
+        } else {
+            // 0 is impossible - use as None value for AtomicU32
+        }
 
         // Encode with protobuf then COBS
         let mut encoder = PbEncoder::new(heapless::Vec::<u8, MAX_SIZE>::new());
