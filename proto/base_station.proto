@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package base_station;
 
+import "backscatter.proto";
+
 enum PowerMuxState {
     POWER_MUX_STATE_USB_POWER = 0;
     POWER_MUX_STATE_BARREL_JACK = 1;
@@ -14,8 +16,6 @@ message Command {
 message DebugStatus {
     uint32 tx_counter = 1;
     uint32 rx_counter = 2;
-    uint32 x_coord = 3;
-    uint32 y_coord = 4;
     uint32 uart_receive_count = 5;
     float comparator_threshold = 6;
 }
@@ -50,4 +50,5 @@ message Status {
     ThermalStatus thermal = 2;
     PowerStatus power = 3;
     CarrierStatus carrier = 4;
+    backscatter.Status backscatter = 5;
 }

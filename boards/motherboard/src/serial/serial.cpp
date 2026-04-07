@@ -3,6 +3,7 @@
 #include "Src/backscatter/backscatter.hpp"
 #include "Src/carrier/carrier.hpp"
 #include "Src/power/power.hpp"
+#include "Src/backscatter/backscatter.hpp"
 #include "Src/thermal/thermal.hpp"
 #include "cobs.hpp"
 #include "common_macros.hpp"
@@ -76,14 +77,10 @@ void SendStatus(void) {
     const auto& p6v_hsd1_currents = power::GetP6VHsd1Currents();
     const auto& p6v_hsd2_currents = power::GetP6VHsd2Currents();
     const bool powered_down = carrier::GetPowerDown();
-    const auto xCoord = backscatter::GetXCoord();
-    const auto yCoord = backscatter::GetYCoord();
 
     status.has_debug = true;
     status.debug.tx_counter = tx_counter++;
     status.debug.rx_counter = rx_counter;
-    status.debug.x_coord = xCoord;
-    status.debug.y_coord = yCoord;
     status.debug.uart_receive_count = backscatter::GetReceiveCount();
 
     status.has_thermal = true;
@@ -112,6 +109,12 @@ void SendStatus(void) {
         status.power.p6v_scatter_current = power::GetP6VScatterCurrent();
         status.power.p12v_current = power::GetP12VCurrent();
     }
+
+    backscatter_status_t backscatterStatus;
+    backscatter::GetStatus(backscatterStatus);
+    
+    status.has_backscatter = true;
+    status.backscatter = backscatterStatus;
 
     pb_ostream_s ostream =
         pb_ostream_from_buffer(pb_buffer, COUNTOF(pb_buffer));

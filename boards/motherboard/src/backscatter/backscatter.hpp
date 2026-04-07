@@ -10,6 +10,6 @@ auto Init() noexcept -> void;
 auto Update1000hz() noexcept -> void;
 auto Receive() noexcept -> void;
 auto GetReceiveCount() noexcept -> uint8_t;
-auto HandleCommand(base_station_command_t* cmd) noexcept -> void;
+auto GetStatus(backscatter_status_t&) noexcept -> void;
 
 }  // namespace backscatter

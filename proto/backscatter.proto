@@ -1,13 +1,10 @@
 syntax = "proto3";
 
-package sensor.backscatter;
-
-import "sensor/state.proto";
+package backscatter;
 
 message Status {
     uint32 vbat_mv = 1;
     uint32 isense_ua = 2;
-    State state = 3;
     uint32 backscatter_tx_count = 4;
 
     optional uint32 x = 5;

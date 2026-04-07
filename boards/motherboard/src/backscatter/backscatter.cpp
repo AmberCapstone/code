@@ -6,7 +6,6 @@
 #include "cobs.hpp"
 
 // Proto
-#include "base_station.pb.h"
 #include "pb_decode.h"
 
 // CubeMX
@@ -29,6 +28,8 @@ static uint16_t rxBufStart = 0;
 static volatile uint16_t rxBufEnd = 0;
 
 static amber::cobs::Decoder<RX_BUF_SIZE> rxDecoder;
+
+static backscatter_status_t lastStatus = BACKSCATTER_STATUS_INIT_ZERO;
 
 static float logvThreshold = 0.9f;
 
@@ -55,28 +56,20 @@ auto Receive() noexcept -> void {
     if (hasData) {
         pb_istream_s istream =
             pb_istream_from_buffer(rxDecoder.buffer, rxDecoder.length);
-        base_station_command_t cmd;
-        if (pb_decode(&istream, &base_station_command_t_msg, &cmd)) {
-            HandleCommand(&cmd);
+        backscatter_status_t status;
+        if (pb_decode(&istream, &backscatter_status_t_msg, &status)) {
+            lastStatus = status;
         }
         rxDecoder.Reset();
     }
 }
 
-auto HandleCommand(base_station_command_t* cmd) noexcept -> void {
-    return;
-}
-
-auto GetXCoord() noexcept -> uint16_t {
-    return (uartBuffer[1] << 8) | uartBuffer[0];
-}
-
-auto GetYCoord() noexcept -> uint16_t {
-    return (uartBuffer[3] << 8) | uartBuffer[2];
-}
-
 auto GetReceiveCount() noexcept -> uint8_t {
     return uartReceiveCount;
+}
+
+auto GetStatus(backscatter_status_t& status) noexcept -> void {
+    status = lastStatus;
 }
 
 void SerialReceiveBytes(uint8_t* bytes, uint32_t len) {
