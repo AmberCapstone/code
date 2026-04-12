@@ -25,6 +25,8 @@ extern "C" {
 extern USBD_HandleTypeDef hUsbDeviceFS;
 }
 
+#define COUNTOF(array) (sizeof(array) / sizeof(array[0]))
+
 // RX State
 static uint32_t rx_counter = 0;
 

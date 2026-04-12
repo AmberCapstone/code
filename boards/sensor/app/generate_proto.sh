@@ -1,1 +1,0 @@
-protoc -I ../proto --python_out=. --pyi_out=. sensor/flash.proto sensor.proto
