@@ -19,8 +19,13 @@ assign_resources! {
     usb: Usb {
         usb: USB,
         dm: PA11,
-        dp: PA12
+        dp: PA12,
+
     },
+    usb_setup: UsbSetup {
+        en: PF3,
+        en_exti: EXTI3,
+    }
     flash: Flash {
         crc: CRC,
         spi: SPI3,
@@ -120,7 +125,6 @@ assign_resources! {
         pf0: PF0, // NC
         pf1: PF1, // NC
         pf2: PF2, // NRST
-        pf3: PF3, // BOOT0
     }
 }
 

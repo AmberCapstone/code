@@ -4,9 +4,8 @@
 #[allow(clippy::wildcard_imports)]
 use crate::resources::*;
 
-use defmt::info;
 use embassy_executor::Spawner;
-use embassy_stm32::{Config, rcc::LsConfig};
+use embassy_stm32::Config;
 use {defmt_rtt as _, panic_probe as _};
 
 mod camera;
@@ -15,6 +14,7 @@ mod comms;
 mod debug_led;
 mod flow;
 mod fpga;
+mod memory;
 mod nvm;
 mod power;
 mod resources;
@@ -44,7 +44,5 @@ async fn main(spawner: Spawner) {
     spawner.spawn(debug_led::led_task(r.leds)).unwrap();
     spawner.spawn(sensors::task(r.sensors)).unwrap();
     spawner.spawn(nvm::task(r.nvm)).unwrap();
-
-    #[cfg(feature = "usb")]
-    spawner.spawn(serial::task(r.usb)).unwrap();
+    spawner.spawn(serial::task(r.usb_setup, r.usb)).unwrap();
 }

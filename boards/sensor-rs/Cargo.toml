@@ -45,7 +45,6 @@ pedantic = "warn"
 
 [features]
 nucleo = []
-usb = []
 
 [profile.release]
 debug = 2

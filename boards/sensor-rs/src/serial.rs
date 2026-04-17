@@ -1,7 +1,13 @@
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use cobs::CobsDecoder;
 use defmt::{info, trace, warn};
-use embassy_futures::join::join3;
-use embassy_stm32::usb::{Driver, Instance};
+use embassy_futures::{join::join3, select};
+use embassy_stm32::{
+    exti::ExtiInput,
+    gpio::{Input, Pull},
+    usb::{Driver, Instance},
+};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
 use embassy_usb::{
@@ -11,9 +17,14 @@ use embassy_usb::{
 };
 use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 
-use crate::{camera, fpga, nvm, proto, resources, sensors, state_machine};
+use crate::{
+    camera, fpga, nvm, proto,
+    resources::{self, Irqs},
+    sensors, state_machine,
+};
 
 const PACKET_SIZE: u16 = 64;
+static USING_USB: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone)]
 struct State {
@@ -27,7 +38,15 @@ static STATE: Mutex<ThreadModeRawMutex, State> = Mutex::new(State {
 });
 
 #[embassy_executor::task]
-pub async fn task(u: resources::Usb) {
+pub async fn task(setup: resources::UsbSetup, u: resources::Usb) {
+    let mut usb_en = ExtiInput::new(setup.en, setup.en_exti, Pull::None, Irqs);
+
+    usb_en.wait_for_high().await;
+    run_with_usb(u).await;
+}
+
+async fn run_with_usb(u: resources::Usb) {
+    USING_USB.store(true, Ordering::Relaxed);
     info!("Starting SERIAL task");
     // Config largely copied from embassy/examples/stm32u/src/bin/usb_serial.rs
     let driver = Driver::new(u.usb, resources::Irqs, u.dp, u.dm);
@@ -165,4 +184,8 @@ impl From<EndpointError> for Disconnected {
             EndpointError::Disabled => Self {},
         }
     }
+}
+
+pub fn is_running() -> bool {
+    USING_USB.load(Ordering::Acquire)
 }

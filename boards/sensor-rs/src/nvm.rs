@@ -3,6 +3,7 @@ use core::cell::Cell;
 use crate::{
     camera,
     flow::StateLock,
+    memory,
     proto::sensor_::nvm_::{Action, Command, Parameters, State, Status},
     resources,
 };
@@ -16,15 +17,6 @@ use embassy_time::{Duration, Timer};
 use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 use sccb::Reg;
 
-const FLASH_ORIGIN: u32 = 0x0800_0000;
-const NVM_ORIGIN: u32 = 0x0803_8000; // Must match memory.x
-const NVM_OFFSET: u32 = NVM_ORIGIN - FLASH_ORIGIN;
-const PAGE_SIZE: u32 = 0x400;
-const _NVM_SIZE: u32 = 32 * 1024;
-
-const LENGTH_OFFSET: u32 = NVM_OFFSET;
-const PROTO_OFFSET: u32 = NVM_OFFSET + 0x0008;
-
 const PARAM_SIZE: usize = micropb::size::max_encoded_size::<Parameters>().next_multiple_of(WRITE_SIZE);
 
 const WRITE_COOLDOWN: Duration = Duration::from_secs(5);
@@ -34,6 +26,21 @@ static STATE: StateLock<State> = StateLock::new(State::Ready);
 static CURRENT_PARAMS: Mutex<ThreadModeRawMutex, Cell<Option<Parameters>>> = Mutex::new(Cell::new(None));
 static NEW_PARAMS: Signal<ThreadModeRawMutex, Parameters> = Signal::new();
 static READOUT_REQUEST: Signal<ThreadModeRawMutex, ()> = Signal::new();
+
+struct Offset {
+    length: u32,
+    proto: u32,
+}
+
+impl From<memory::Map> for Offset {
+    fn from(map: memory::Map) -> Self {
+        let nvm_offset = map.nvm_start - map.flash_start;
+        Self {
+            length: nvm_offset,
+            proto: nvm_offset + 0x0008,
+        }
+    }
+}
 
 #[embassy_executor::task]
 pub async fn task(r: resources::Nvm) {
@@ -56,16 +63,18 @@ pub async fn task(r: resources::Nvm) {
 }
 
 fn read_parameters(flash: &mut Bank1Region<'_, Blocking>) -> Parameters {
+    let offset: Offset = memory::Map::get().into();
+
     info!("Reading parameters from NVM");
     let mut length_bytes = [0u8; 4];
-    if let Err(e) = flash.blocking_read(LENGTH_OFFSET, &mut length_bytes) {
+    if let Err(e) = flash.blocking_read(offset.length, &mut length_bytes) {
         error!("Failed to read NVM: {}", e);
         return default_parameters();
     }
     let length = usize::from_le_bytes(length_bytes);
 
     let mut buf = [0u8; PARAM_SIZE];
-    if let Err(e) = flash.blocking_read(PROTO_OFFSET, &mut buf) {
+    if let Err(e) = flash.blocking_read(offset.proto, &mut buf) {
         error!("Failed to read NVM: {}", e);
         return default_parameters();
     }
@@ -84,11 +93,12 @@ fn read_parameters(flash: &mut Bank1Region<'_, Blocking>) -> Parameters {
 fn write_parameters(flash: &mut Bank1Region<'_, Blocking>, parameters: &Parameters) {
     info!("Writing parameters to NVM");
     let mut encoder = PbEncoder::new(heapless::Vec::<u8, PARAM_SIZE>::new());
+    let offset: Offset = memory::Map::get().into();
 
     info!("Erasing NVM");
     if let Err(e) = flash.blocking_erase(
-        LENGTH_OFFSET,
-        (PROTO_OFFSET + PARAM_SIZE as u32).next_multiple_of(PAGE_SIZE),
+        offset.length,
+        (offset.proto + PARAM_SIZE as u32).next_multiple_of(memory::PAGE_SIZE),
     ) {
         error!("Failed to erase NVM: {}", e);
         return;
@@ -104,13 +114,13 @@ fn write_parameters(flash: &mut Bank1Region<'_, Blocking>, parameters: &Paramete
 
     let mut length_bytes = [0u8; WRITE_SIZE];
     length_bytes[0..4].copy_from_slice(&to_write.len().to_le_bytes());
-    if let Err(e) = flash.blocking_write(LENGTH_OFFSET, &length_bytes) {
+    if let Err(e) = flash.blocking_write(offset.length, &length_bytes) {
         error!("Failed to write length field: {}", e);
         return;
     }
 
     to_write.resize_default(PARAM_SIZE).unwrap();
-    if let Err(e) = flash.blocking_write(PROTO_OFFSET, &to_write) {
+    if let Err(e) = flash.blocking_write(offset.proto, &to_write) {
         error!("Failed to writecommand to NVM: {}", e);
         return;
     }

@@ -21,7 +21,7 @@ use crate::{
         sensor_::fpga_::{Action, CaptureSource, Centroid, Command, DataRequest, State, Status, Vessels, image_},
     },
     resources::{Fpga, FpgaPower, Irqs},
-    sensors, state_machine,
+    sensors, serial, state_machine,
 };
 
 pub mod flash;
@@ -183,8 +183,9 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource, data_request: DataReq
                 let _ = SPI_RX_TO_SEND.try_send(Vec::from_slice(&new_line.data()[0..SPI_PROTO_MAX_BYTES]).unwrap());
                 cs_n.set_high();
 
-                #[cfg(feature = "usb")]
-                LINES_TO_SEND.send(new_line).await; // blocks until channel has capacity
+                if serial::is_running() {
+                    LINES_TO_SEND.send(new_line).await; // blocks until channel has capacity
+                }
             }
         }
         DataRequest::Vessels => {
@@ -206,11 +207,12 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource, data_request: DataReq
             let backscatter_msg = backscatter_::Status::default().init_x(x).init_y(y);
             comms::send(backscatter_msg);
 
-            #[cfg(feature = "usb")]
-            VESSELS_TO_SEND.signal(Vessels {
-                count: u32::from(buffer[0]), // should be 1
-                centroids: [Centroid { x, y }].into(),
-            });
+            if serial::is_running() {
+                VESSELS_TO_SEND.signal(Vessels {
+                    count: u32::from(buffer[0]), // should be 1
+                    centroids: [Centroid { x, y }].into(),
+                });
+            }
             Timer::after_millis(100).await; // hacky way to hold data ready
         }
         _ => (),
