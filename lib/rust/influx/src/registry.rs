@@ -12,13 +12,13 @@ pub(crate) struct ValueRegistry {
 
 impl ValueRegistry {
     pub(crate) fn new(policy_router: PolicyRouter) -> Self {
-        let flattener = Flattener::new()
-            .set_preserve_empty_objects(true)
-            .set_preserve_empty_objects(true)
-            .set_array_formatting(ArrayFormatting::Surrounded {
-                start: "[".to_string(),
-                end: "]".to_string(),
-            });
+        let flattener =
+            Flattener::new()
+                .set_preserve_empty_objects(false)
+                .set_array_formatting(ArrayFormatting::Surrounded {
+                    start: "[".to_string(),
+                    end: "]".to_string(),
+                });
 
         Self {
             registry: HashMap::new(),
