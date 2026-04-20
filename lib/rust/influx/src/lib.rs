@@ -165,13 +165,15 @@ impl Logger {
                         request = request.header("Authorization", format!("Token {token}"));
                     }
 
-                    request = request.body(batch.join("\n"));
+                    let body = batch.join("\n");
+                    request = request.body(body.clone());
 
-                    tracing::debug!("Making Influx request");
                     let response = request.send().await;
 
-                    match response {
-                        Ok(r) => tracing::debug!(response=?r, "Received Influx response"),
+                    match response.map(|r| r.status().as_u16()) {
+                        Ok(400) => tracing::warn!(body = body, "Invalid request"),
+                        Ok(204) => tracing::debug!("Sucessfully wrote to DB"),
+                        Ok(code) => tracing::info!(status = code, "Unknown Influx response status code"),
                         Err(e) => tracing::error!(err = ?e, "Failed to write to DB"),
                     }
 
