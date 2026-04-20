@@ -10,6 +10,7 @@ pub struct UserParameters {
     name: String,
     supercapacitor_uf: u32,
     camera_settings: HashMap<sccb::Reg, String>,
+    usb_starts_on: bool,
 }
 
 #[derive(Error, Clone, Debug)]
@@ -33,6 +34,7 @@ impl TryFrom<UserParameters> for Parameters {
             name: value.name,
             supercapacitor_uf: value.supercapacitor_uf,
             camera_settings: pack_camera_settings(&value.camera_settings)?,
+            usb_starts_on: value.usb_starts_on,
         })
     }
 }
@@ -43,6 +45,7 @@ impl From<Parameters> for UserParameters {
             name: value.name,
             supercapacitor_uf: value.supercapacitor_uf,
             camera_settings: unpack_camera_settings(&value.camera_settings),
+            usb_starts_on: value.usb_starts_on,
         }
     }
 }

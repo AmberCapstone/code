@@ -21,6 +21,7 @@ message Parameters {
     uint32 supercapacitor_uf = 2;
     repeated fixed32 camera_settings =
         3;  // packed as [0x0000VVRR] where 0xRR is reg address, 0xVV is value
+    bool usb_starts_on = 4;
 }
 
 message Command {
