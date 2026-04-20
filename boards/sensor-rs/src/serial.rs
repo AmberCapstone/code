@@ -2,14 +2,14 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use cobs::CobsDecoder;
 use defmt::{info, trace, warn};
-use embassy_futures::{join::join3, select};
+use embassy_futures::{join::join3, select::select};
 use embassy_stm32::{
     exti::ExtiInput,
-    gpio::{Input, Pull},
+    gpio::Pull,
     usb::{Driver, Instance},
 };
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
-use embassy_time::{Duration, Ticker};
+use embassy_time::{Duration, Ticker, Timer};
 use embassy_usb::{
     Builder,
     class::cdc_acm::{self, CdcAcmClass, Receiver, Sender},
@@ -18,13 +18,15 @@ use embassy_usb::{
 use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 
 use crate::{
-    camera, fpga, nvm, proto,
+    camera,
+    flow::{DebouncedExtiInput, StateLock},
+    fpga, nvm, proto,
     resources::{self, Irqs},
     sensors, state_machine,
 };
 
 const PACKET_SIZE: u16 = 64;
-static USING_USB: AtomicBool = AtomicBool::new(false);
+static USING_USB: StateLock<bool> = StateLock::new(false);
 
 #[derive(Clone)]
 struct State {
@@ -38,62 +40,73 @@ static STATE: Mutex<ThreadModeRawMutex, State> = Mutex::new(State {
 });
 
 #[embassy_executor::task]
-pub async fn task(setup: resources::UsbSetup, u: resources::Usb) {
-    let mut usb_en = ExtiInput::new(setup.en, setup.en_exti, Pull::None, Irqs);
-
-    usb_en.wait_for_high().await;
-    run_with_usb(u).await;
-}
-
-async fn run_with_usb(u: resources::Usb) {
-    USING_USB.store(true, Ordering::Relaxed);
+pub async fn task(setup: resources::UsbSetup, mut u: resources::Usb) {
     info!("Starting SERIAL task");
-    // Config largely copied from embassy/examples/stm32u/src/bin/usb_serial.rs
-    let driver = Driver::new(u.usb, resources::Irqs, u.dp, u.dm);
-
-    let mut config = embassy_usb::Config::new(0xbf00, 0xc0de);
-    config.manufacturer = Some("amber");
-    config.product = Some("Sensor Board");
-
-    let mut config_descriptor = [0; 256];
-    let mut bos_descriptor = [0; 256];
-    let mut control_buf = [0; 256];
-
-    let mut state = cdc_acm::State::new();
-
-    let mut builder = Builder::new(
-        driver,
-        config,
-        &mut config_descriptor,
-        &mut bos_descriptor,
-        &mut [],
-        &mut control_buf,
+    let mut usb_en = DebouncedExtiInput::new(
+        ExtiInput::new(setup.en, setup.en_exti, Pull::None, Irqs),
+        Duration::from_millis(500),
     );
 
-    let (mut sender, mut receiver) = CdcAcmClass::new(&mut builder, &mut state, PACKET_SIZE).split();
+    let mut wait_for_button = Some(!nvm::get_usb_start_on());
 
-    let mut usb = builder.build();
-    let usb_fut = usb.run(); // can be suspended
-
-    let send_fut = async {
-        loop {
-            sender.wait_connection().await;
-            info!("TX Connected");
-            let _ = send_loop(&mut sender).await;
-            info!("TX Disconnected");
+    loop {
+        if wait_for_button.take().unwrap_or(true) {
+            info!("USB Off");
+            USING_USB.set(false);
+            usb_en.wait_for_rising_edge().await;
         }
-    };
-    let recv_fut = async {
-        loop {
-            receiver.wait_connection().await;
-            info!("RX Connected");
-            let _ = receive_loop(&mut receiver).await;
-            info!("TX Disconnected");
-        }
-    };
 
-    join3(usb_fut, send_fut, recv_fut).await; // never returns
-    info!("SERIAL task ended");
+        info!("USB On");
+        USING_USB.set(true);
+
+        let driver = Driver::new(u.usb.reborrow(), resources::Irqs, u.dp.reborrow(), u.dm.reborrow());
+
+        let mut config = embassy_usb::Config::new(0xbf00, 0xc0de);
+        config.manufacturer = Some("amber");
+        config.product = Some("Sensor Board");
+
+        let mut config_descriptor = [0; 256];
+        let mut bos_descriptor = [0; 256];
+        let mut control_buf = [0; 256];
+
+        let mut state = cdc_acm::State::new();
+
+        let mut builder = Builder::new(
+            driver,
+            config,
+            &mut config_descriptor,
+            &mut bos_descriptor,
+            &mut [],
+            &mut control_buf,
+        );
+
+        let (mut sender, mut receiver) = CdcAcmClass::new(&mut builder, &mut state, PACKET_SIZE).split();
+
+        let mut usb = builder.build();
+        let usb_fut = usb.run();
+
+        let send_fut = async {
+            loop {
+                sender.wait_connection().await;
+                info!("TX Connected");
+                let _ = send_loop(&mut sender).await;
+                info!("TX Disconnected");
+            }
+        };
+        let recv_fut = async {
+            loop {
+                receiver.wait_connection().await;
+                info!("RX Connected");
+                let _ = receive_loop(&mut receiver).await;
+                info!("TX Disconnected");
+            }
+        };
+
+        select(usb_en.wait_for_rising_edge(), join3(usb_fut, send_fut, recv_fut)).await;
+        usb.disable().await;
+        // WARNING: This doesn't fully disable the USB peripheral. Power consumption remains higher
+        // than it was before `Driver::new`
+    }
 }
 
 async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>) -> Result<(), Disconnected> {
@@ -187,5 +200,5 @@ impl From<EndpointError> for Disconnected {
 }
 
 pub fn is_running() -> bool {
-    USING_USB.load(Ordering::Acquire)
+    USING_USB.get()
 }

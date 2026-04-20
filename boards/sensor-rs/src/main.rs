@@ -34,7 +34,9 @@ async fn main(spawner: Spawner) {
 
     let p = embassy_stm32::init(config);
 
-    let r = split_resources!(p);
+    let mut r = split_resources!(p);
+
+    nvm::init(&mut r.nvm);
 
     spawner.spawn(state_machine::task(r.state_machine)).unwrap();
     spawner.spawn(camera::task(r.camera_power, r.camera)).unwrap();

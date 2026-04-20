@@ -42,12 +42,19 @@ impl From<memory::Map> for Offset {
     }
 }
 
+pub fn init(r: &mut resources::Nvm) {
+    info!("Initializing NVM");
+    let mut flash = flash::Flash::new_blocking(r.flash.reborrow())
+        .into_blocking_regions()
+        .bank1_region;
+
+    CURRENT_PARAMS.lock(|c| c.set(Some(read_parameters(&mut flash))));
+}
+
 #[embassy_executor::task]
 pub async fn task(r: resources::Nvm) {
     info!("Starting NVM task");
     let mut flash = flash::Flash::new_blocking(r.flash).into_blocking_regions().bank1_region;
-
-    CURRENT_PARAMS.lock(|c| c.set(Some(read_parameters(&mut flash))));
 
     loop {
         STATE.set(State::Ready);
@@ -121,40 +128,35 @@ fn write_parameters(flash: &mut Bank1Region<'_, Blocking>, parameters: &Paramete
 
     to_write.resize_default(PARAM_SIZE).unwrap();
     if let Err(e) = flash.blocking_write(offset.proto, &to_write) {
-        error!("Failed to writecommand to NVM: {}", e);
+        error!("Failed to write command to NVM: {}", e);
         return;
     }
     info!("Write complete");
 }
 
-fn get_parameters() -> Parameters {
+fn get_from_parameters<T, F: Fn(&Parameters) -> T>(f: F) -> T {
     CURRENT_PARAMS.lock(|c| {
         let val = c.take();
-        let ret = val.clone().unwrap_or(default_parameters());
+        let ret = f(val.as_ref().expect("Parameters have been loaded"));
         c.set(val);
         ret
     })
 }
 
+fn get_parameters() -> Parameters {
+    get_from_parameters(Clone::clone)
+}
+
 pub fn get_name() -> heapless::String<7> {
-    CURRENT_PARAMS.lock(|c| {
-        let val = c.take();
-        let name = val.as_ref().map(|p| p.name.clone()).expect("parameters are set by now");
-        c.set(val);
-        name
-    })
+    get_from_parameters(|p| p.name.clone())
 }
 
 pub fn get_camera_settings() -> heapless::Vec<(Reg, u8), { sccb::NUM_REGISTERS }> {
-    CURRENT_PARAMS.lock(|c| {
-        let val = c.take();
-        let settings = val
-            .as_ref()
-            .map(|p| p.camera_settings.clone())
-            .expect("parameters are set by now");
-        c.set(val);
-        unpack_camera_settings(&settings)
-    })
+    get_from_parameters(|p| unpack_camera_settings(&p.camera_settings))
+}
+
+pub fn get_usb_start_on() -> bool {
+    get_from_parameters(|f| *f.usb_starts_on())
 }
 
 pub fn handle_command(mut command: Command) {
@@ -201,6 +203,7 @@ fn default_parameters() -> Parameters {
         name: "unknown".try_into().unwrap(),
         supercapacitor_uf: 200_000,
         camera_settings: pack_camera_settings(&camera::get_default_settings()),
+        usb_starts_on: true,
     }
 }
 
