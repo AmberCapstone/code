@@ -21,7 +21,7 @@ use crate::{
         sensor_::fpga_::{Action, CaptureSource, Centroid, Command, DataRequest, State, Status, Vessels, image_},
     },
     resources::{Fpga, FpgaPower, Irqs},
-    sensors, serial, state_machine,
+    serial,
 };
 
 pub mod flash;
@@ -88,10 +88,12 @@ pub async fn run_spiflash(r: &mut Fpga) {
 
 pub async fn run_capture(r: &mut Fpga, src: CaptureSource, data_request: DataRequest) {
     STATE.set(State::Booting);
+
     let _creset_n = OutputOpenDrain::new(r.creset_n.reborrow(), Level::High, Speed::Low);
     let mut cdone = ExtiInput::new(r.cdone.reborrow(), r.cdone_exti.reborrow(), Pull::None, Irqs);
 
     cdone.wait_for_high().await;
+
     STATE.set(State::Running);
 
     let mut start_capture = OutputOpenDrain::new(r.gpio1.reborrow(), Level::Low, Speed::Low);
@@ -128,6 +130,7 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource, data_request: DataReq
         CaptureSource::FakeSram => spi_cmd::Command::FakeCaptureWrite,
         _ => panic!("src={:?} should not have passed through handle_process", src),
     } as u8;
+
     info!("Setting capture source over SPI (cmd={:x})", cmd);
     cs_n.set_low();
     let cmd = [cmd];
@@ -165,57 +168,80 @@ pub async fn run_capture(r: &mut Fpga, src: CaptureSource, data_request: DataReq
         DataRequest::Image => {
             info!("Reading Image");
             for line_no in 0..NUM_LINES {
-                info!("Line no {}", line_no);
-                let mut new_line = image_::Line::default()
-                    .init_number(line_no)
-                    .init_data([0u8; LINE_LEN as usize].into());
-
-                let address = line_no * LINE_LEN / BYTE_PER_ADDR;
-                let [_, _, addr_hi, addr_lo] = address.to_be_bytes();
-
-                cs_n.set_low();
-                let to_tx = [spi_cmd::Command::ReadData as u8, addr_hi, addr_lo];
-                let _ = SPI_TX_TO_SEND.try_send(to_tx.into());
-                let _res = spi.write(&to_tx).await;
-                let _res = spi.read(new_line.mut_data()).await;
-
-                // Only send the first 64 bytes of image data
-                let _ = SPI_RX_TO_SEND.try_send(Vec::from_slice(&new_line.data()[0..SPI_PROTO_MAX_BYTES]).unwrap());
-                cs_n.set_high();
+                let line = read_line(&mut spi, &mut cs_n, line_no).await;
 
                 if serial::is_running() {
-                    LINES_TO_SEND.send(new_line).await; // blocks until channel has capacity
+                    LINES_TO_SEND.send(line).await; // blocks until channel has capacity
                 }
             }
         }
         DataRequest::Vessels => {
-            info!("Reading Vessels");
-            cs_n.set_low();
-            let to_tx = [spi_cmd::Command::GetVessels as u8];
-            let _ = SPI_TX_TO_SEND.try_send(to_tx.into());
-            let _res = spi.write(&to_tx).await;
+            let vessels = read_vessels(spi, cs_n).await;
 
-            let mut buffer = [0u8; 5];
-            let _res = spi.read(&mut buffer).await;
-            let _ = SPI_RX_TO_SEND.try_send(buffer.into());
-            cs_n.set_high();
-
-            let x = u32::from(u16::from_le_bytes(buffer[1..3].try_into().unwrap()));
-            let y = u32::from(u16::from_le_bytes(buffer[3..5].try_into().unwrap()));
-            info!("Boat at (x,y) = ({}, {})", x, y);
-
-            let backscatter_msg = backscatter_::Status::default().init_x(x).init_y(y);
+            let backscatter_msg = backscatter_::Status::default()
+                .init_x(vessels.centroids.first().map_or(0, |c| c.x))
+                .init_y(vessels.centroids.first().map_or(0, |c| c.y));
             comms::send(backscatter_msg);
 
             if serial::is_running() {
-                VESSELS_TO_SEND.signal(Vessels {
-                    count: u32::from(buffer[0]), // should be 1
-                    centroids: [Centroid { x, y }].into(),
-                });
+                VESSELS_TO_SEND.signal(vessels);
             }
-            Timer::after_millis(100).await; // hacky way to hold data ready
+            Timer::after_millis(100).await; // hacky way to hold data ready state
         }
         _ => (),
+    }
+}
+
+async fn read_line(
+    spi: &mut Spi<'_, embassy_stm32::mode::Async, spi::mode::Master>,
+    cs_n: &mut OutputOpenDrain<'_>,
+    line_no: u32,
+) -> image_::Line {
+    info!("Line no {}", line_no);
+    let mut new_line = image_::Line::default()
+        .init_number(line_no)
+        .init_data([0u8; LINE_LEN as usize].into());
+
+    let address = line_no * LINE_LEN / BYTE_PER_ADDR;
+    let [_, _, addr_hi, addr_lo] = address.to_be_bytes();
+
+    cs_n.set_low();
+    let to_tx = [spi_cmd::Command::ReadData as u8, addr_hi, addr_lo];
+    let _ = SPI_TX_TO_SEND.try_send(to_tx.into());
+    let _res = spi.write(&to_tx).await;
+    let _res = spi.read(new_line.mut_data()).await;
+
+    // Only send the first 64 bytes of image data
+    let _ = SPI_RX_TO_SEND.try_send(Vec::from_slice(&new_line.data()[0..SPI_PROTO_MAX_BYTES]).unwrap());
+    cs_n.set_high();
+
+    new_line
+}
+
+async fn read_vessels(
+    mut spi: Spi<'_, embassy_stm32::mode::Async, spi::mode::Master>,
+    mut cs_n: OutputOpenDrain<'_>,
+) -> Vessels {
+    info!("Reading Vessels");
+    cs_n.set_low();
+
+    let to_tx = [spi_cmd::Command::GetVessels as u8];
+    let _ = SPI_TX_TO_SEND.try_send(to_tx.into());
+    let _ = spi.write(&to_tx).await;
+
+    let mut buffer = [0u8; 5];
+    let _ = spi.read(&mut buffer).await;
+    let _ = SPI_RX_TO_SEND.try_send(buffer.into());
+    cs_n.set_high();
+
+    let count = u32::from(buffer[0]);
+    let x = u32::from(u16::from_le_bytes(buffer[1..3].try_into().unwrap()));
+    let y = u32::from(u16::from_le_bytes(buffer[3..5].try_into().unwrap()));
+    // FPGA currently only returns 1 (x,y) pair
+
+    Vessels {
+        count,
+        centroids: [Centroid { x, y }].into(),
     }
 }
 
@@ -227,6 +253,10 @@ pub fn capture(data: DataRequest) {
 
 pub fn turn_off() {
     POWER_SIGNAL.turn_off();
+}
+
+pub fn is_off() -> bool {
+    STATE.is(State::Off)
 }
 
 pub fn is_done() -> bool {

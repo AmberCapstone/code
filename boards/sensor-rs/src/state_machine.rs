@@ -6,10 +6,7 @@ use crate::{
     fpga::{self},
     nvm,
     proto::backscatter_,
-    proto::sensor_::{
-        self, Action,
-        fpga_::{self, DataRequest},
-    },
+    proto::sensor_::{self, Action, fpga_::DataRequest},
     proto::state_::State,
     resources::{self, Irqs},
     sensors,
@@ -56,11 +53,11 @@ pub async fn task(r: resources::StateMachine) {
 async fn low_power_loop() -> ! {
     STATE.set(State::LowCharge);
     LAST_CAPTURE_INTERVAL.store(0, Ordering::Relaxed);
+
+    debug_led::send(debug_led::Sequence::LowCharge);
+    fpga::turn_off();
     loop {
         info!("In low_power_loop() {} mV", sensors::get_vbat_mv());
-        fpga::turn_off();
-
-        debug_led::send(debug_led::Sequence::LowCharge);
         comms::send(backscatter_::Status::default());
 
         Timer::after_millis(2000).await;
@@ -71,6 +68,7 @@ async fn normal_loop() -> ! {
     info!("Entering normal_loop");
     loop {
         fpga::turn_off();
+        poll::until(fpga::is_off, Duration::from_millis(100)).await;
         match NORMAL_STATE.get() {
             NormalState::Manual => select(manual_loop(), NORMAL_STATE.wait()).await,
             NormalState::Monitor => select(monitor(), NORMAL_STATE.wait()).await,
@@ -80,6 +78,7 @@ async fn normal_loop() -> ! {
 
 async fn manual_loop() -> ! {
     STATE.set(State::Manual);
+    debug_led::send(debug_led::Sequence::Manual);
     loop {
         info!("In manual_loop()");
         comms::send(backscatter_::Status::default());
@@ -88,6 +87,7 @@ async fn manual_loop() -> ! {
 }
 async fn monitor() -> ! {
     LAST_CAPTURE_INTERVAL.store(0, Ordering::Relaxed);
+    debug_led::send(debug_led::Sequence::Monitor);
     loop {
         info!("Charging");
         STATE.set(State::Charging);
@@ -107,7 +107,10 @@ async fn monitor() -> ! {
 
         poll::until(fpga::is_done, Duration::from_millis(100)).await;
         info!("Done capture");
-        LAST_CAPTURE_INTERVAL.store(start.elapsed().as_millis() as u32, Ordering::Relaxed);
+        LAST_CAPTURE_INTERVAL.store(
+            u32::try_from(start.elapsed().as_millis()).unwrap_or(u32::MAX),
+            Ordering::Relaxed,
+        );
     }
 }
 

@@ -1045,6 +1045,7 @@ dependencies = [
  "embassy-usb",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
+ "embedded-storage-async",
  "heapless 0.9.2",
  "micropb",
  "micropb-gen",

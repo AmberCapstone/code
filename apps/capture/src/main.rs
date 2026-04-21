@@ -64,7 +64,7 @@ async fn capture(args: Args, control: &mut control::Client, status_socket: &mut 
         .await
         .context("Timed out trying to reset the sensor")??;
 
-    println!("Starting Capture");
+    println!("Entering manual mode");
     let mut cmd = Command::default();
     cmd.set_action(Action::Manual);
     control.send(cmd).await?;
@@ -72,6 +72,7 @@ async fn capture(args: Args, control: &mut control::Client, status_socket: &mut 
         .await
         .context("Timed out trying to enter manual mode")??;
 
+    println!("Starting Capture");
     let cmd = Command {
         fpga: Some({
             let mut c = fpga::Command::default();
@@ -82,7 +83,7 @@ async fn capture(args: Args, control: &mut control::Client, status_socket: &mut 
         }),
         ..Default::default()
     };
-    timeout(Duration::from_secs(1), control.send(cmd)).await??;
+    control.send(cmd).await?;
 
     match args.data {
         Data::Image => {

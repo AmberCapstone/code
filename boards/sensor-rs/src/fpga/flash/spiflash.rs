@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use core::result;
+use core::{ptr::addr_eq, result};
 
 use defmt::{Debug2Format, debug, error, info};
 use embassy_stm32::{
@@ -11,6 +11,7 @@ use embassy_stm32::{
 };
 use embassy_time::Timer;
 use embedded_hal::digital::OutputPin;
+use embedded_storage_async::nor_flash::{self, NorFlash, NorFlashError, NorFlashErrorKind, ReadNorFlash};
 
 mod command;
 mod id;
@@ -53,6 +54,7 @@ pub enum Error {
     UnxpectedId,
     PeripheralFailure(spi::Error),
     OutOfBounds,
+    NotAligned,
 }
 
 impl From<spi::Error> for Error {
@@ -199,21 +201,33 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
     }
 
     pub async fn page_erase(&mut self, addr: u32) -> Result<(), Error> {
-        self.enable_writing().await?;
-        self.send_header(Command::PageErase, addr).await?;
-        self.wait_for_idle().await
+        if addr.is_multiple_of(size::PAGE) {
+            self.enable_writing().await?;
+            self.send_header(Command::PageErase, addr).await?;
+            self.wait_for_idle().await
+        } else {
+            Err(Error::NotAligned)
+        }
     }
 
     pub async fn subsector_erase(&mut self, addr: u32) -> Result<(), Error> {
-        self.enable_writing().await?;
-        self.send_header(Command::SubsectorErase, addr).await?;
-        self.wait_for_idle().await
+        if addr.is_multiple_of(size::SUBSECTOR) {
+            self.enable_writing().await?;
+            self.send_header(Command::SubsectorErase, addr).await?;
+            self.wait_for_idle().await
+        } else {
+            Err(Error::NotAligned)
+        }
     }
 
     pub async fn sector_erase(&mut self, addr: u32) -> Result<(), Error> {
-        self.enable_writing().await?;
-        self.send_header(Command::SectorErase, addr).await?;
-        self.wait_for_idle().await
+        if addr.is_multiple_of(size::SECTOR) {
+            self.enable_writing().await?;
+            self.send_header(Command::SectorErase, addr).await?;
+            self.wait_for_idle().await
+        } else {
+            Err(Error::NotAligned)
+        }
     }
 
     pub async fn chip_erase(&mut self) -> Result<(), Error> {
@@ -229,5 +243,49 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
         self.spi.transfer_in_place(&mut txrx).await?;
 
         Ok(Id::from(&[txrx[1], txrx[2], txrx[3]]))
+    }
+}
+
+impl<P: OutputPin> nor_flash::ErrorType for SpiFlash<'_, P> {
+    type Error = Error;
+}
+
+impl NorFlashError for Error {
+    fn kind(&self) -> NorFlashErrorKind {
+        match self {
+            Error::UnxpectedId => todo!(),
+            Error::PeripheralFailure(error) => NorFlashErrorKind::Other,
+            Error::OutOfBounds => NorFlashErrorKind::OutOfBounds,
+            Error::NotAligned => NorFlashErrorKind::NotAligned,
+        }
+    }
+}
+
+impl<P: OutputPin> ReadNorFlash for SpiFlash<'_, P> {
+    const READ_SIZE: usize = 1;
+
+    async fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
+        self.read_data(offset, bytes).await
+    }
+
+    fn capacity(&self) -> usize {
+        size::CHIP as usize
+    }
+}
+
+impl<P: OutputPin> NorFlash for SpiFlash<'_, P> {
+    const WRITE_SIZE: usize = size::PAGE as usize;
+    const ERASE_SIZE: usize = size::PAGE as usize;
+
+    async fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
+        // This could be more efficient by erasing subsectors/sectors when `to>>from`
+        for pg in (from..to).step_by(Self::ERASE_SIZE) {
+            self.page_erase(pg).await?;
+        }
+        Ok(())
+    }
+
+    async fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+        self.page_write(offset, bytes).await
     }
 }

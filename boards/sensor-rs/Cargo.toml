@@ -33,6 +33,7 @@ embassy-time = { version = "0.5.1", features = [
 embassy-usb = { version = "0.5.1", default-features = false }
 embedded-hal = "1.0.0"
 embedded-hal-async = "1.0.0"
+embedded-storage-async = "0.4.1"
 heapless = "0.9.2"
 micropb = { version = "0.6.0", features = ["container-heapless-0-9"] }
 panic-probe = "1.0.0"
