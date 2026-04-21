@@ -3,17 +3,16 @@ use core::sync::atomic::{AtomicU32, Ordering};
 use crate::{proto::backscatter_, sensors, state_machine};
 use defmt::{error, info};
 use embassy_stm32::{
-    gpio::{Flex, Level, Output, Speed},
-    rcc::{Mco, McoConfig, McoSource},
+    gpio::{Flex, Speed},
+    rcc::{Mco, McoConfig},
     usart::{self, Uart},
 };
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, signal::Signal};
-use embassy_time::{Duration, Timer};
+use embassy_time::Timer;
 use micropb::{MessageEncode, PbEncoder};
 
 use crate::{
     clock::MCO_CLOCKS,
-    debug_led,
     resources::{self, Irqs},
 };
 
@@ -45,8 +44,6 @@ async fn backscatter(r: &mut resources::Comms, mut msg: Msg) {
         config.speed = Speed::VeryHigh;
         config
     });
-
-    debug_led::send(debug_led::Sequence::Backscattering);
 
     let count = BACKSCATTER_TX_COUNT.load(Ordering::Acquire);
     msg.set_backscatter_tx_count(count);

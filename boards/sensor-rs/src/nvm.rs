@@ -105,7 +105,7 @@ fn write_parameters(flash: &mut Bank1Region<'_, Blocking>, parameters: &Paramete
     info!("Erasing NVM");
     if let Err(e) = flash.blocking_erase(
         offset.length,
-        (offset.proto + PARAM_SIZE as u32).next_multiple_of(memory::PAGE_SIZE),
+        (offset.proto + u32::try_from(PARAM_SIZE).unwrap()).next_multiple_of(memory::PAGE_SIZE),
     ) {
         error!("Failed to erase NVM: {}", e);
         return;

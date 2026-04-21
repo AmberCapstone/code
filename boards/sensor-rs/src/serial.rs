@@ -1,5 +1,3 @@
-use core::sync::atomic::{AtomicBool, Ordering};
-
 use cobs::CobsDecoder;
 use defmt::{info, trace, warn};
 use embassy_futures::{join::join3, select::select};
@@ -9,7 +7,7 @@ use embassy_stm32::{
     usb::{Driver, Instance},
 };
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::{Duration, Ticker};
 use embassy_usb::{
     Builder,
     class::cdc_acm::{self, CdcAcmClass, Receiver, Sender},

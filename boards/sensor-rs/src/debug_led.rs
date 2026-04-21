@@ -14,10 +14,9 @@ static NEW_SEQUENCE: Signal<ThreadModeRawMutex, Sequence> = Signal::new();
 #[derive(Clone, Copy)]
 pub enum Sequence {
     Toggle,
-    Error,
     LowCharge,
-    Backscattering,
-    Charging,
+    Monitor,
+    Manual,
     On,
     Off,
 }
@@ -26,6 +25,14 @@ async fn pulse_ms(led: &mut Output<'_>, ms: u64) {
     led.set_high();
     Timer::after_millis(ms).await;
     led.set_low();
+}
+
+async fn pulses(led: &mut Output<'_>, count: u32) {
+    pulse_ms(led, 1).await; // No delay before first pulse
+    for _ in 1..count {
+        Timer::after_millis(150).await;
+        pulse_ms(led, 1).await;
+    }
 }
 
 impl Sequence {
@@ -37,32 +44,26 @@ impl Sequence {
                 led.set_low();
                 Timer::after_millis(500).await;
             },
-            Sequence::Error => loop {
-                pulse_ms(led, 100).await;
-                Timer::after_millis(400).await;
-            },
             Sequence::LowCharge => loop {
-                pulse_ms(led, 2).await;
-                pending::<()>().await;
+                pulses(led, 1).await;
+                Timer::after_millis(2000).await;
             },
-            Sequence::Backscattering => {
-                pulse_ms(led, 10).await;
-                Timer::after_millis(50).await;
-                pulse_ms(led, 10).await;
-                pending::<()>().await;
-            }
+            Sequence::Monitor => loop {
+                pulses(led, 2).await;
+                Timer::after_millis(900).await;
+            },
+            Sequence::Manual => loop {
+                pulses(led, 2).await;
+                Timer::after_millis(500).await;
+                pulses(led, 1).await;
+                Timer::after_millis(1500).await;
+            },
             Sequence::On => {
                 led.set_high();
                 pending::<()>().await;
             }
             Sequence::Off => {
                 led.set_low();
-                pending::<()>().await;
-            }
-            Sequence::Charging => {
-                pulse_ms(led, 50).await;
-                Timer::after_millis(50).await;
-                pulse_ms(led, 50).await;
                 pending::<()>().await;
             }
         }
@@ -84,5 +85,5 @@ pub async fn led_task(r: resources::Leds) {
 }
 
 pub fn send(s: Sequence) {
-    // NEW_SEQUENCE.signal(s);
+    NEW_SEQUENCE.signal(s);
 }

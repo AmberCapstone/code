@@ -4,7 +4,7 @@ use embassy_futures::select::select;
 use embassy_stm32::{
     gpio::{Flex, Level, Output, OutputOpenDrain, Speed},
     i2c::{self, I2c},
-    rcc::{Mco, McoConfig, McoPrescaler, McoSource},
+    rcc::{Mco, McoConfig},
     time::Hertz,
 };
 use embassy_time::Timer;

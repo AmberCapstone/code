@@ -10,6 +10,7 @@ unsafe extern "C" {
     static __nvm_end: u32;
 }
 
+#[allow(unused, reason = "Struct should completely describe memory.x")]
 pub struct Map {
     pub flash_start: u32,
     pub flash_end: u32,

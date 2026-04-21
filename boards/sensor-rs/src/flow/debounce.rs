@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use embassy_stm32::exti::ExtiInput;
 use embassy_stm32::mode::Async;
 use embassy_time::{Duration, Instant};
