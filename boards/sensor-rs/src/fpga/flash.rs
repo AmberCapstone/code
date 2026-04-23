@@ -106,7 +106,7 @@ async fn run(r: &mut Flash) {
                     let mut c = spi::Config::default();
                     c.bit_order = spi::BitOrder::MsbFirst;
                     c.mode = spi::MODE_3;
-                    c.frequency = Hertz(1_000_000);
+                    c.frequency = Hertz(12_000_000);
                     c.gpio_speed = Speed::VeryHigh;
                     c
                 },
