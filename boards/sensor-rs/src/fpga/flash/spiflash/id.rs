@@ -6,16 +6,6 @@ pub struct Id {
 }
 
 impl Id {
-    #[cfg(feature = "nucleo")]
-    pub const fn expected() -> Self {
-        Self {
-            manufacturer: 0x20,
-            memory_type: 0x80,
-            capacity: 0x11,
-        }
-    }
-
-    #[cfg(not(feature = "nucleo"))]
     pub const fn expected() -> Self {
         Self {
             manufacturer: 0xef,

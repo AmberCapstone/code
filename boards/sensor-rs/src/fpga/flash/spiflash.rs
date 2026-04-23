@@ -23,11 +23,6 @@ pub mod size {
     pub const PAGE: u32 = 0x100;
     pub const SUBSECTOR: u32 = 0x1000;
     pub const SECTOR: u32 = 0x1_0000;
-
-    #[cfg(feature = "nucleo")] // st M25PE10
-    pub const CHIP: u32 = 0x2_0000;
-
-    #[cfg(not(feature = "nucleo"))] // winbond W25Q80
     pub const CHIP: u32 = 0x10_0000;
 }
 
@@ -169,20 +164,6 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
         self.wait_for_idle().await
     }
 
-    pub async fn page_write(&mut self, addr: u32, data: &[u8]) -> Result<(), Error> {
-        check_bounds(addr, data.len())?;
-
-        self.enable_writing().await?;
-
-        {
-            let cs = CsGuard::new(&mut self.cs_n);
-            self.spi.write(&header(Command::PageWrite, addr)).await?;
-            self.spi.write(data).await?;
-        }
-
-        self.wait_for_idle().await
-    }
-
     pub async fn read_data(&mut self, addr: u32, out: &mut [u8]) -> Result<(), Error> {
         check_bounds(addr, out.len())?;
 
@@ -198,16 +179,6 @@ impl<'a, P: OutputPin> SpiFlash<'a, P> {
         self.spi.write(&header(command, addr)).await?;
 
         Ok(())
-    }
-
-    pub async fn page_erase(&mut self, addr: u32) -> Result<(), Error> {
-        if addr.is_multiple_of(size::PAGE) {
-            self.enable_writing().await?;
-            self.send_header(Command::PageErase, addr).await?;
-            self.wait_for_idle().await
-        } else {
-            Err(Error::NotAligned)
-        }
     }
 
     pub async fn subsector_erase(&mut self, addr: u32) -> Result<(), Error> {
@@ -275,17 +246,17 @@ impl<P: OutputPin> ReadNorFlash for SpiFlash<'_, P> {
 
 impl<P: OutputPin> NorFlash for SpiFlash<'_, P> {
     const WRITE_SIZE: usize = size::PAGE as usize;
-    const ERASE_SIZE: usize = size::PAGE as usize;
+    const ERASE_SIZE: usize = size::SUBSECTOR as usize;
 
     async fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
-        // This could be more efficient by erasing subsectors/sectors when `to>>from`
+        // This could be more efficient by erasing larger sectors when `to>>from`
         for pg in (from..to).step_by(Self::ERASE_SIZE) {
-            self.page_erase(pg).await?;
+            self.subsector_erase(pg).await?;
         }
         Ok(())
     }
 
     async fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.page_write(offset, bytes).await
+        self.page_program(offset, bytes).await
     }
 }

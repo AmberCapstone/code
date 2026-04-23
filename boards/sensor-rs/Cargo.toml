@@ -44,9 +44,6 @@ sccb = { version = "0.1.0", path = "../../lib/rust/sccb", features = [
 [lints.clippy]
 pedantic = "warn"
 
-[features]
-nucleo = []
-
 [profile.release]
 debug = 2
 

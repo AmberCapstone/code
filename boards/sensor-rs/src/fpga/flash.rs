@@ -16,6 +16,7 @@ use embassy_sync::{
 };
 use embassy_time::{Duration, TimeoutError, WithTimeout};
 use embedded_hal::digital::OutputPin;
+use embedded_storage_async::nor_flash::{NorFlash, ReadNorFlash};
 
 use crate::{
     flow::StateLock,
@@ -101,21 +102,11 @@ async fn run(r: &mut Flash) {
                 r.dma_tx.reborrow(),
                 r.dma_rx.reborrow(),
                 Irqs,
-                #[cfg(not(feature = "nucleo"))]
                 {
                     let mut c = spi::Config::default();
                     c.bit_order = spi::BitOrder::MsbFirst;
                     c.mode = spi::MODE_3;
                     c.frequency = Hertz(1_000_000);
-                    c.gpio_speed = Speed::VeryHigh;
-                    c
-                },
-                #[cfg(feature = "nucleo")]
-                {
-                    let mut c = spi::Config::default();
-                    c.bit_order = spi::BitOrder::MsbFirst;
-                    c.mode = spi::MODE_0;
-                    c.frequency = Hertz(12_000_000);
                     c.gpio_speed = Speed::VeryHigh;
                     c
                 },
@@ -200,7 +191,8 @@ async fn flash_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>
             }
 
             debug!("Programming page {}", pg_num);
-            flash.page_program(pg_num * PAGE_SIZE, data).await?;
+
+            flash.write(pg_num * PAGE_SIZE, data).await?;
             break;
         }
     }
@@ -228,7 +220,7 @@ async fn readout_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'
 
             debug!("Reading page {}", req_num);
             flash
-                .read_data(req_num * PAGE_SIZE, page.mut_data().expect("Data exists"))
+                .read(req_num * PAGE_SIZE, page.mut_data().expect("data buffer exists"))
                 .await?;
 
             page.set_crc(compute_crc(req_num, page.data().unwrap(), crc));
