@@ -16,7 +16,7 @@ use embassy_usb::{
 use micropb::{MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 
 use crate::{
-    camera,
+    camera, comms,
     flow::{DebouncedExtiInput, StateLock},
     fpga, nvm, proto,
     resources::{self, Irqs},
@@ -133,6 +133,10 @@ async fn send_loop<'d, T: Instance + 'd>(sender: &mut Sender<'d, Driver<'d, T>>)
             status.set_last_capture_interval_ms(last_capture_ms);
         } else {
             // 0 is impossible - use as None value for AtomicU32
+        }
+
+        if let Some(bs) = comms::get_backscatter() {
+            status.set_backscatter(bs);
         }
 
         // Encode with protobuf then COBS

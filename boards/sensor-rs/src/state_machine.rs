@@ -18,7 +18,7 @@ use embassy_stm32::{exti::ExtiInput, gpio::Pull};
 use embassy_time::{Duration, Instant, Timer};
 
 const MIN_CAPTURE_VBAT_MV: u32 = 4800;
-const MIN_CAPTURE_PERIOD: Duration = Duration::from_secs(1);
+const MIN_CAPTURE_PERIOD: Duration = Duration::from_millis(1500);
 
 #[derive(Clone, Copy, PartialEq)]
 enum NormalState {

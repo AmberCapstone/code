@@ -45,7 +45,6 @@ enum Segment {
     SEGMENT_QVGA0 = 2;
     SEGMENT_QVGA1 = 3;
     SEGMENT_QVGA2 = 4;
-    SEGMENT_QVGA3 = 5;
-    SEGMENT_QVGA4 = 6;
-    SEGMENT_USER = 7;
+    SEGMENT_USER = 5;
+    SEGMENT_DFU = 6;
 }

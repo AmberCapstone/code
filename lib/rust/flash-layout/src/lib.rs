@@ -40,9 +40,8 @@ pub const fn get_region(segment: Segment) -> Region {
         Qvga0 => Region::subsectors(32, 40),
         Qvga1 => Region::subsectors(72, 40),
         Qvga2 => Region::subsectors(112, 40),
-        Qvga3 => Region::subsectors(152, 40),
-        Qvga4 => Region::subsectors(192, 40),
-        User => Region::subsectors(232, 24),
+        User => Region::subsectors(152, 40),
+        Dfu => Region::subsectors(192, 64),
     }
 }
 
@@ -51,7 +50,7 @@ const fn validate_layout() {
     use Segment::*;
 
     // EnumIter is not const so this list but be manually updated.
-    let segments = &[Unknown, Fpga, Qvga0, Qvga1, Qvga2, Qvga3, Qvga4, User];
+    let segments = &[Unknown, Fpga, Qvga0, Qvga1, Qvga2, User, Dfu];
 
     let mut i = 0;
     let mut total_size = 0;

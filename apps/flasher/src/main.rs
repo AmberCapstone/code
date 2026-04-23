@@ -278,9 +278,8 @@ enum StrSegment {
     Qvga0,
     Qvga1,
     Qvga2,
-    Qvga3,
-    Qvga4,
     User,
+    Dfu,
 }
 
 impl From<StrSegment> for Segment {
@@ -290,9 +289,8 @@ impl From<StrSegment> for Segment {
             StrSegment::Qvga0 => Segment::Qvga0,
             StrSegment::Qvga1 => Segment::Qvga1,
             StrSegment::Qvga2 => Segment::Qvga2,
-            StrSegment::Qvga3 => Segment::Qvga3,
-            StrSegment::Qvga4 => Segment::Qvga4,
             StrSegment::User => Segment::User,
+            StrSegment::Dfu => Segment::Dfu,
         }
     }
 }

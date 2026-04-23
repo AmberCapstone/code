@@ -1,6 +1,9 @@
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use crate::{proto::backscatter_, sensors, state_machine};
+use crate::{
+    proto::{self, backscatter_},
+    sensors, state_machine,
+};
 use defmt::{error, info};
 use embassy_stm32::{
     gpio::{Flex, Speed},
@@ -22,6 +25,7 @@ const COBS_MAX_SIZE: usize = cobs::max_encoding_length(MAX_SIZE) + 1;
 static MESSAGE: Signal<ThreadModeRawMutex, Msg> = Signal::new();
 
 static BACKSCATTER_TX_COUNT: AtomicU32 = AtomicU32::new(0);
+static LAST_BACKSCATTER: Signal<ThreadModeRawMutex, proto::backscatter_::Status> = Signal::new();
 
 #[embassy_executor::task]
 pub async fn task(mut r: resources::Comms) {
@@ -51,6 +55,8 @@ async fn backscatter(r: &mut resources::Comms, mut msg: Msg) {
     msg.set_vbat_mv(sensors::get_vbat_mv());
     msg.set_isense_ua(sensors::get_isense_ua());
     msg.set_state(state_machine::get_state());
+
+    LAST_BACKSCATTER.signal(msg);
 
     Timer::after_millis(10).await;
 
@@ -90,4 +96,8 @@ async fn backscatter(r: &mut resources::Comms, mut msg: Msg) {
 
     Timer::after_millis(100).await; // await doesn't actually wait
     Flex::new(r.carrier.reborrow()).set_as_analog(); // Dropping MCO doesn't disable pin
+}
+
+pub fn get_backscatter() -> Option<proto::backscatter_::Status> {
+    LAST_BACKSCATTER.try_take()
 }

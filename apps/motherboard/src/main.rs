@@ -1,6 +1,8 @@
 use std::time::Duration;
 
+use amber_connect::codec::PbReceiver;
 use anyhow::anyhow;
+use clap::{Parser, ValueEnum};
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
@@ -27,11 +29,27 @@ use tokio::{
 };
 use tokio_serial::UsbPortInfo;
 use tokio_util::sync::CancellationToken;
+use zeromq::{Socket, SubSocket};
 
 mod backscatter_server;
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about=None)]
+struct Args {
+    source: Source,
+}
+
+#[derive(ValueEnum, Debug, Clone)]
+enum Source {
+    Serial,
+    Client,
+    Mock,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+
     let (status_tx, status_rx) = mpsc::channel::<Status>(100);
     let (backscatter_tx, backscatter_rx) = mpsc::channel::<Status>(100);
     let (printer_tx, printer_rx) = mpsc::channel::<Status>(100);
@@ -42,12 +60,14 @@ async fn main() -> anyhow::Result<()> {
     let mut services = JoinSet::<anyhow::Result<()>>::new();
     services.spawn(fan(status_rx, vec![backscatter_tx, printer_tx], stop.clone()));
 
-    #[cfg(feature = "mock")]
-    services.spawn(mock_serial(status_tx, stop.clone()));
+    match args.source {
+        Source::Serial => services.spawn(serial::run(command_rx, status_tx, is_base_station, stop.clone()).map(Ok)),
+        Source::Client => services.spawn(socket_client(status_tx, stop.clone())),
+        Source::Mock => services.spawn(mock_serial(status_tx, stop.clone())),
+    };
 
-    #[cfg(not(feature = "mock"))]
-    services.spawn(serial::run(command_rx, status_tx, is_base_station, stop.clone()).map(Ok));
     services.spawn(backscatter_server::run(backscatter_rx, stop.clone()).map_err(anyhow::Error::from));
+
     services.spawn(tui(printer_rx, stop.clone()));
     services.spawn(input_handler(stop.clone()));
 
@@ -58,6 +78,31 @@ async fn main() -> anyhow::Result<()> {
     services.join_all().await;
 
     Ok(())
+}
+
+/// If motherboard isn't being used, try connecting to `sensor-server` and adapting the backscatter
+/// messages from USB.
+async fn socket_client(status_tx: mpsc::Sender<Status>, stop: CancellationToken) -> anyhow::Result<()> {
+    stop.run_until_cancelled(async {
+        let mut status_socket = SubSocket::new();
+        status_socket.connect(amber_connect::endpoint::STATUS).await?;
+        status_socket.subscribe("").await?;
+
+        loop {
+            select! {
+                Ok(status) = status_socket.recv_msg::<proto::sensor::Status>() => {
+                    if let Some(bs) = status.backscatter {
+                        status_tx.send(Status {
+                            backscatter: Some(bs),
+                            ..Default::default()
+                        }).await?;
+                    }
+                }
+            }
+        }
+    })
+    .await
+    .unwrap_or(Ok(()))
 }
 
 async fn mock_serial(status_tx: mpsc::Sender<Status>, stop: CancellationToken) -> anyhow::Result<()> {
