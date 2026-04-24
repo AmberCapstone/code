@@ -91,16 +91,15 @@ async fn flash(file: FlashFile, control: &mut control::Client, status_socket: &m
     .context("Timed out trying to enter manual mode")??;
 
     println!("Activating SPI Flash circuit");
-    let mut fpga_cmd = fpga::Command::default();
+    let mut cmd = Command::default();
+
+    let fpga_cmd = cmd.fpga.get_or_insert_default();
     fpga_cmd.set_action(fpga::Action::SpiFlash);
-    fpga_cmd
-        .flash
-        .get_or_insert_default()
-        .set_action(flash::Action::Program);
-    let cmd = Command {
-        fpga: Some(fpga_cmd),
-        ..Default::default()
-    };
+
+    let flash_cmd = fpga_cmd.flash.get_or_insert_default();
+    flash_cmd.set_action(flash::Action::Program);
+    flash_cmd.set_segment(file.segment());
+
     command_until(
         cmd,
         |s| {
@@ -166,11 +165,9 @@ async fn flash(file: FlashFile, control: &mut control::Client, status_socket: &m
     bar.finish();
 
     let mut cmd = Command::default();
-    cmd.fpga
-        .get_or_insert_default()
-        .flash
-        .get_or_insert_default()
-        .set_action(flash::Action::Readout);
+    let flash_cmd = cmd.fpga.get_or_insert_default().flash.get_or_insert_default();
+    flash_cmd.set_action(flash::Action::Readout);
+    flash_cmd.set_segment(file.segment());
     command_until(
         cmd,
         |s| {

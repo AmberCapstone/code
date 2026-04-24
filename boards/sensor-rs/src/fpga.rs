@@ -55,8 +55,8 @@ pub async fn task(r_power: FpgaPower, mut r_fpga: Fpga) {
         flash::turn_off();
         camera::turn_off();
 
-        poll::until(flash::is_off, Duration::from_millis(50)).await;
-        poll::until(camera::is_off, Duration::from_millis(50)).await;
+        poll::until(flash::is_off, Duration::from_millis(10)).await;
+        poll::until(camera::is_off, Duration::from_millis(10)).await;
 
         power_en.set_low();
         STATE.set(State::Off);

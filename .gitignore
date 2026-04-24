@@ -16,3 +16,6 @@ target
 
 # rustfmt backups
 **/*.rs.bk
+
+# Binaries
+*.bin

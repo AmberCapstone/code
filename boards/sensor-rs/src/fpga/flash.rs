@@ -22,21 +22,21 @@ use crate::{
     flow::StateLock,
     fpga::flash::spiflash::SpiFlash,
     power::PowerSignal,
-    proto::sensor_::fpga_::flash_::{Action, Command, Page, State, Status},
+    proto::sensor_::fpga_::flash_::{Action, Command, Page, Segment, State, Status},
     resources::{Flash, Irqs},
 };
 
+mod layout;
 mod spiflash;
 
 use spiflash::size::PAGE as PAGE_SIZE;
 
 const PAGE_MAX_ATTEMPTS: u32 = 5;
 const ARQ_N: usize = 1;
-const PAGE_PER_FILE: u32 = 512;
 
 enum Trigger {
-    Flash,
-    Readout,
+    Flash(Segment),
+    Readout(Segment),
 }
 
 #[derive(Debug, defmt::Format)]
@@ -93,29 +93,25 @@ async fn run(r: &mut Flash) {
         // Activate SPI
         let mut _reset_n = OutputOpenDrain::new(r.reset_n.reborrow(), Level::High, Speed::Low);
         let cs_n = OutputOpenDrain::new(r.cs_n.reborrow(), Level::High, Speed::Low);
-        let flash = spiflash::SpiFlash::init(
-            Spi::new(
-                r.spi.reborrow(),
-                r.sck.reborrow(),
-                r.mosi.reborrow(),
-                r.miso.reborrow(),
-                r.dma_tx.reborrow(),
-                r.dma_rx.reborrow(),
-                Irqs,
-                {
-                    let mut c = spi::Config::default();
-                    c.bit_order = spi::BitOrder::MsbFirst;
-                    c.mode = spi::MODE_3;
-                    c.frequency = Hertz(12_000_000);
-                    c.gpio_speed = Speed::VeryHigh;
-                    c
-                },
-            ),
-            cs_n,
-        )
-        .await;
+        let spi = Spi::new(
+            r.spi.reborrow(),
+            r.sck.reborrow(),
+            r.mosi.reborrow(),
+            r.miso.reborrow(),
+            r.dma_tx.reborrow(),
+            r.dma_rx.reborrow(),
+            Irqs,
+            {
+                let mut c = spi::Config::default();
+                c.bit_order = spi::BitOrder::MsbFirst;
+                c.mode = spi::MODE_3;
+                c.frequency = Hertz(12_000_000);
+                c.gpio_speed = Speed::VeryHigh;
+                c
+            },
+        );
 
-        let Ok(mut flash) = flash else {
+        let Ok(mut flash) = spiflash::SpiFlash::init(spi, cs_n).await else {
             error!("Failed to configure SPI. Ignoring action");
             continue;
         };
@@ -132,7 +128,16 @@ async fn run(r: &mut Flash) {
             .unwrap(),
         );
 
-        trigger.handle(&mut flash, &mut crc).await;
+        match trigger {
+            Trigger::Flash(segment) => match flash_file(&mut flash, &mut crc, segment).await {
+                Ok(()) => info!("Wrote file to flash!"),
+                Err(e) => error!("Failed to flash the file {:?}", e),
+            },
+            Trigger::Readout(segment) => match readout_file(&mut flash, &mut crc, segment).await {
+                Ok(()) => info!("Readout complete!"),
+                Err(e) => error!("Readout failed {:?}", e),
+            },
+        }
         DONE.signal(());
 
         // Deactivate SPI
@@ -140,30 +145,22 @@ async fn run(r: &mut Flash) {
     }
 }
 
-impl Trigger {
-    async fn handle<P: OutputPin>(&self, flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>) {
-        match self {
-            Trigger::Flash => match flash_file(flash, crc).await {
-                Ok(()) => info!("Wrote file to flash!"),
-                Err(e) => error!("Failed to flash the file {:?}", e),
-            },
-            Trigger::Readout => match readout_file(flash, crc).await {
-                Ok(()) => info!("Readout complete!"),
-                Err(e) => error!("Readout failed {:?}", e),
-            },
-        }
-    }
-}
-
-async fn flash_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>) -> Result<(), Error> {
+async fn flash_file<P: OutputPin>(
+    flash: &mut SpiFlash<'_, P>,
+    crc: &mut Crc<'_>,
+    segment: Segment,
+) -> Result<(), Error> {
     STATE.set(State::Erasing);
-    info!("Erasing Flash");
-    flash.chip_erase().await?;
+
+    let bounds = layout::get_bounds(segment);
+
+    info!("Erasing Flash Segment {}", bounds);
+    flash.erase(bounds.origin, bounds.end()).await?;
 
     STATE.set(State::Programming);
-    info!("Programming Flash");
+    info!("Programming Flash Segment {}", bounds);
 
-    for pg_num in 0..PAGE_PER_FILE {
+    for pg_num in 0..bounds.num_pages() {
         RN.store(pg_num, Ordering::Release);
 
         let mut attempt = 0;
@@ -192,7 +189,7 @@ async fn flash_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>
 
             debug!("Programming page {}", pg_num);
 
-            flash.write(pg_num * PAGE_SIZE, data).await?;
+            flash.write(bounds.origin + pg_num * PAGE_SIZE, data).await?;
             break;
         }
     }
@@ -200,16 +197,22 @@ async fn flash_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>
     Ok(())
 }
 
-async fn readout_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'_>) -> Result<(), Error> {
+async fn readout_file<P: OutputPin>(
+    flash: &mut SpiFlash<'_, P>,
+    crc: &mut Crc<'_>,
+    segment: Segment,
+) -> Result<(), Error> {
     STATE.set(State::Readout);
-    info!("Starting readout");
+
+    let bounds = layout::get_bounds(segment);
+    info!("Reading Flash Segment {}", bounds);
 
     let mut last_page_loaded: Option<u32> = None;
     READOUT_RN.reset();
 
     loop {
         let req_num = READOUT_RN.wait().await;
-        if req_num >= PAGE_PER_FILE {
+        if req_num >= bounds.num_pages() {
             break;
         }
 
@@ -220,7 +223,10 @@ async fn readout_file<P: OutputPin>(flash: &mut SpiFlash<'_, P>, crc: &mut Crc<'
 
             debug!("Reading page {}", req_num);
             flash
-                .read(req_num * PAGE_SIZE, page.mut_data().expect("data buffer exists"))
+                .read(
+                    bounds.origin + req_num * PAGE_SIZE,
+                    page.mut_data().expect("data buffer exists"),
+                )
                 .await?;
 
             page.set_crc(compute_crc(req_num, page.data().unwrap(), crc));
@@ -265,10 +271,12 @@ pub fn get_status() -> Status {
 }
 
 pub fn handle_command(mut command: Command) {
-    if let Some(action) = command.take_action() {
+    if let Some(action) = command.take_action()
+        && let Some(segment) = command.take_segment()
+    {
         match action {
-            Action::Program => OPERATION.signal(Trigger::Flash),
-            Action::Readout => OPERATION.signal(Trigger::Readout),
+            Action::Program => OPERATION.signal(Trigger::Flash(segment)),
+            Action::Readout => OPERATION.signal(Trigger::Readout(segment)),
             _ => (),
         }
     }
