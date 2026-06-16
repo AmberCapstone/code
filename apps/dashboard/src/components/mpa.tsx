@@ -42,7 +42,8 @@ export default function MPA({ data }: { data: BackscatterData }) {
         <div>
             <MpaSvg ref={svgRef} />
         </div>
-        <h1>Position: ({pos.current.x}, {pos.current.y})</h1>
+        <h1>Coordinate: (4{8 - pos.current.x / 100}&deg; N, 7{4 - pos.current.y / 100}&deg; W)</h1>
+        <h2> Pixel Position: ({pos.current.x}, {pos.current.y})</h2>
         <h2>Supercapacitor: {data.vbatMv} mV</h2>
         <h2>{data.state.replace("STATE_", "")}</h2>
         <p>
